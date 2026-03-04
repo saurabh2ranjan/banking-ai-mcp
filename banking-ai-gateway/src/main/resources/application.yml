@@ -1,0 +1,99 @@
+spring:
+  application:
+    name: banking-ai-gateway
+
+  # ── Database ─────────────────────────────────────────────────────────────────
+  datasource:
+    # H2 for demo — replace with PostgreSQL in production:
+    # url: jdbc:postgresql://localhost:5432/bankingdb
+    # driver-class-name: org.postgresql.Driver
+    url: jdbc:h2:mem:bankingdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 300000
+      connection-timeout: 20000
+      max-lifetime: 1800000
+      pool-name: BankingHikariPool
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop    # Use 'validate' with Flyway in production
+    show-sql: false
+    open-in-view: false        # Avoid lazy-loading surprises
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  # ── Spring AI ────────────────────────────────────────────────────────────────
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:your-openai-api-key-here}
+      chat:
+        options:
+          model: gpt-4o
+          temperature: 0.1    # Low temp for precise, deterministic banking responses
+          max-tokens: 2048
+
+    mcp:
+      server:
+        name: banking-mcp-server
+        version: 1.0.0
+        type: SYNC
+
+  # ── Jackson ──────────────────────────────────────────────────────────────────
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+
+# ── Server ─────────────────────────────────────────────────────────────────────
+server:
+  port: 8080
+  error:
+    include-message: never      # Never expose error details in HTTP errors
+    include-stacktrace: never
+  compression:
+    enabled: true
+
+# ── Security ───────────────────────────────────────────────────────────────────
+banking:
+  security:
+    api-key: ${BANKING_API_KEY:banking-demo-key-2024}
+
+# ── Actuator ───────────────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+# ── Logging ─────────────────────────────────────────────────────────────────────
+logging:
+  level:
+    com.banking:          DEBUG
+    org.springframework.ai: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL:    WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId}] %logger{36} - %msg%n"

@@ -1,0 +1,10 @@
+spring:
+  ai:
+    openai:
+      api-key: test-key-not-used
+      chat:
+        options:
+          model: gpt-4o
+banking:
+  security:
+    api-key: test-api-key

@@ -1,0 +1,8 @@
+dependencies {
+    implementation(project(":banking-common"))
+    implementation(project(":banking-payment"))
+    implementation(project(":banking-notification"))
+    implementation("org.springframework.boot:spring-boot-starter")
+    implementation("org.springframework.ai:spring-ai-core")
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+}

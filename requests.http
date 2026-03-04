@@ -1,0 +1,233 @@
+### Banking AI MCP — REST API Examples
+### Use with IntelliJ HTTP Client or VS Code REST Client extension
+### Set BANKING_API_KEY env var or use the default below
+
+@baseUrl = http://localhost:8080
+@apiKey = banking-demo-key-2024
+@contentType = application/json
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CUSTOMER ONBOARDING
+# ─────────────────────────────────────────────────────────────────────────────
+
+### 1. Onboard a new customer
+POST {{baseUrl}}/api/v1/onboarding/customers
+X-API-Key: {{apiKey}}
+Content-Type: {{contentType}}
+
+{
+  "firstName": "Emma",
+  "lastName": "Wilson",
+  "dateOfBirth": "1992-08-14",
+  "gender": "FEMALE",
+  "email": "emma.wilson@example.com",
+  "mobile": "+447700900999",
+  "nationality": "British",
+  "panNumber": "EMWIL9999J",
+  "idType": "PAN_CARD",
+  "idExpiryDate": "2031-12-31",
+  "address": {
+    "line1": "55 Rose Garden",
+    "line2": "Flat 3B",
+    "city": "Edinburgh",
+    "state": "Scotland",
+    "postalCode": "EH1 1BB",
+    "country": "GBR"
+  },
+  "employmentType": "SALARIED",
+  "employerName": "FinTech Ltd",
+  "annualIncome": 72000,
+  "incomeCurrency": "GBP"
+}
+
+### 2. Get customer by ID (use ID from response above)
+GET {{baseUrl}}/api/v1/onboarding/customers/CUST-00000001
+X-API-Key: {{apiKey}}
+
+### 3. Get pending KYC customers (compliance queue)
+GET {{baseUrl}}/api/v1/onboarding/kyc/pending?page=0&size=10
+X-API-Key: {{apiKey}}
+
+### 4. Approve KYC
+PATCH {{baseUrl}}/api/v1/onboarding/customers/CUST-00000004/kyc
+X-API-Key: {{apiKey}}
+Content-Type: {{contentType}}
+
+{
+  "kycStatus": "VERIFIED"
+}
+
+### 5. Reject KYC
+PATCH {{baseUrl}}/api/v1/onboarding/customers/CUST-00000004/kyc
+X-API-Key: {{apiKey}}
+Content-Type: {{contentType}}
+
+{
+  "kycStatus": "REJECTED",
+  "rejectionReason": "Identity document unclear — resubmit passport"
+}
+
+### 6. Complete onboarding
+POST {{baseUrl}}/api/v1/onboarding/customers/CUST-00000001/complete
+X-API-Key: {{apiKey}}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ACCOUNTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+### 7. Open a savings account
+POST {{baseUrl}}/api/v1/accounts
+X-API-Key: {{apiKey}}
+Content-Type: {{contentType}}
+
+{
+  "customerId": "CUST-00000001",
+  "accountType": "SAVINGS",
+  "currency": "GBP",
+  "displayName": "Holiday Fund",
+  "initialDeposit": 1000.00
+}
+
+### 8. Get account details
+GET {{baseUrl}}/api/v1/accounts/ACC-202401-001001-5
+X-API-Key: {{apiKey}}
+
+### 9. Get account balance
+GET {{baseUrl}}/api/v1/accounts/ACC-202401-001001-5/balance
+X-API-Key: {{apiKey}}
+
+### 10. Get all accounts for a customer
+GET {{baseUrl}}/api/v1/accounts?customerId=CUST-00000001
+X-API-Key: {{apiKey}}
+
+### 11. Block account
+POST {{baseUrl}}/api/v1/accounts/ACC-202401-001001-5/block?reason=Suspected+fraud+activity
+X-API-Key: {{apiKey}}
+
+### 12. Unblock account
+POST {{baseUrl}}/api/v1/accounts/ACC-202401-001001-5/unblock
+X-API-Key: {{apiKey}}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PAYMENTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+### 13. Initiate a small safe IMPS payment
+POST {{baseUrl}}/api/v1/payments
+X-API-Key: {{apiKey}}
+Content-Type: {{contentType}}
+
+{
+  "customerId": "CUST-00000001",
+  "sourceAccountId": "ACC-202401-001001-5",
+  "destinationAccountId": "ACC-202401-002001-3",
+  "amount": 500.00,
+  "currency": "GBP",
+  "paymentType": "IMPS",
+  "description": "Rent payment"
+}
+
+### 14. Initiate a high-value SWIFT (will trigger fraud)
+POST {{baseUrl}}/api/v1/payments
+X-API-Key: {{apiKey}}
+Content-Type: {{contentType}}
+
+{
+  "customerId": "CUST-00000003",
+  "sourceAccountId": "ACC-202401-004001-2",
+  "destinationAccountId": "ACC-202401-003001-7",
+  "amount": 150000.00,
+  "currency": "USD",
+  "paymentType": "SWIFT",
+  "description": "International wire transfer"
+}
+
+### 15. Get payment status (replace with actual paymentId)
+GET {{baseUrl}}/api/v1/payments/PAYMENT-ID-HERE
+X-API-Key: {{apiKey}}
+
+### 16. Get payment history for an account
+GET {{baseUrl}}/api/v1/payments?accountId=ACC-202401-001001-5&page=0&size=10
+X-API-Key: {{apiKey}}
+
+### 17. Get daily spending summary
+GET {{baseUrl}}/api/v1/payments/accounts/ACC-202401-001001-5/daily-summary
+X-API-Key: {{apiKey}}
+
+### 18. Reverse a payment
+POST {{baseUrl}}/api/v1/payments/PAYMENT-ID-HERE/reverse?reason=Customer+dispute
+X-API-Key: {{apiKey}}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AI CHAT (MCP-powered)
+# ─────────────────────────────────────────────────────────────────────────────
+
+### 19. Simple balance query via AI
+POST {{baseUrl}}/api/v1/banking-ai/chat
+X-API-Key: {{apiKey}}
+Content-Type: {{contentType}}
+
+{
+  "sessionId": "demo-session-1",
+  "message": "What is the current balance of account ACC-202401-001001-5?"
+}
+
+### 20. Full payment workflow via AI (initiate + fraud check + process)
+POST {{baseUrl}}/api/v1/banking-ai/chat
+X-API-Key: {{apiKey}}
+Content-Type: {{contentType}}
+
+{
+  "sessionId": "demo-session-1",
+  "message": "Send 500 GBP from ACC-202401-001001-5 to ACC-202401-002001-3 via IMPS for rent. Run fraud check and process if safe."
+}
+
+### 21. High-value fraud scenario
+POST {{baseUrl}}/api/v1/banking-ai/chat
+X-API-Key: {{apiKey}}
+Content-Type: {{contentType}}
+
+{
+  "sessionId": "demo-session-2",
+  "message": "Initiate a SWIFT transfer of 200000 USD from ACC-202401-004001-2 to ACC-202401-003001-7. Analyse for fraud and take appropriate action with full reasoning."
+}
+
+### 22. KYC workflow via AI
+POST {{baseUrl}}/api/v1/banking-ai/chat
+X-API-Key: {{apiKey}}
+Content-Type: {{contentType}}
+
+{
+  "sessionId": "demo-session-3",
+  "message": "Show me all customers with pending KYC review. Then approve KYC for CUST-00000004."
+}
+
+### 23. Full onboarding via AI
+POST {{baseUrl}}/api/v1/banking-ai/chat
+X-API-Key: {{apiKey}}
+Content-Type: {{contentType}}
+
+{
+  "sessionId": "demo-session-4",
+  "message": "Get the profile of customer CUST-00000001. Then tell me all her accounts and their balances."
+}
+
+### 24. Clear AI session
+DELETE {{baseUrl}}/api/v1/banking-ai/sessions/demo-session-1
+X-API-Key: {{apiKey}}
+
+### 25. View session history
+GET {{baseUrl}}/api/v1/banking-ai/sessions/demo-session-1/history
+X-API-Key: {{apiKey}}
+
+### 26. Health check (no auth required)
+GET {{baseUrl}}/actuator/health
+
+### 27. Metrics
+GET {{baseUrl}}/actuator/metrics
+X-API-Key: {{apiKey}}
+
+### 28. H2 Console
+# Open in browser: http://localhost:8080/h2-console
+# JDBC URL: jdbc:h2:mem:bankingdb
+# Username: sa  |  Password: (empty)
