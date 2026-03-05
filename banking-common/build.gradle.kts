@@ -8,3 +8,9 @@ dependencies {
     implementation("org.apache.commons:commons-lang3:3.17.0")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
+
+// Test dependencies already included via root allprojects block
+// Explicit additions for this module:
+dependencies {
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+}
