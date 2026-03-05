@@ -10,11 +10,7 @@ include(
     'banking-ai-gateway'
 )
 
-// ── Centralised repository declaration (Gradle 9 idiomatic) ──────────────────
-// FAIL_ON_PROJECT_REPOS prevents individual build.gradle files from adding their
-// own repos, ensuring a single authoritative list here.
 dependencyResolutionManagement {
-    repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
     repositories {
         mavenCentral()
         maven { url 'https://repo.spring.io/milestone' }

@@ -1,6 +1,7 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '4.0.3' apply false
+    id 'org.springframework.boot'            version '4.0.3' apply false
+    id 'io.spring.dependency-management'     version '1.1.7' apply false
 }
 
 ext {
@@ -13,6 +14,7 @@ ext {
 
 subprojects {
     apply plugin: 'java'
+    apply plugin: 'io.spring.dependency-management'
 
     group   = 'com.banking'
     version = '1.0.0-SNAPSHOT'
@@ -23,14 +25,32 @@ subprojects {
         }
     }
 
-    // Apply BOMs to EVERY configuration (compileClasspath, runtimeClasspath, testCompileClasspath, etc.)
-    // This runs before any subproject dependencies{} block is evaluated.
-    afterEvaluate {
-        configurations.all {
-            incoming.beforeResolve {
-                // no-op — actual constraints added via dependencies block below
-            }
+    // dependency-management plugin hooks in before dependency resolution —
+    // this is the correct way to apply BOMs in Gradle 9 multi-project builds
+    dependencyManagement {
+        imports {
+            mavenBom "org.springframework.boot:spring-boot-dependencies:${springBootVersion}"
+            mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+            mavenBom "org.testcontainers:testcontainers-bom:${testcontainersVer}"
         }
+    }
+
+    dependencies {
+        // Lombok
+        compileOnly             "org.projectlombok:lombok:${lombokVersion}"
+        annotationProcessor     "org.projectlombok:lombok:${lombokVersion}"
+        testCompileOnly         "org.projectlombok:lombok:${lombokVersion}"
+        testAnnotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+
+        // MapStruct
+        implementation          "org.mapstruct:mapstruct:${mapstructVersion}"
+        annotationProcessor     "org.mapstruct:mapstruct-processor:${mapstructVersion}"
+        annotationProcessor      'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+
+        // Test
+        testImplementation 'org.springframework.boot:spring-boot-starter-test'
+        testImplementation 'org.assertj:assertj-core'
+        testImplementation 'org.mockito:mockito-core'
     }
 
     tasks.withType(Test).configureEach {

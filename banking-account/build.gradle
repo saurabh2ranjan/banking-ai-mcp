@@ -1,5 +1,3 @@
-apply from: "${rootProject.projectDir}/gradle/bom.gradle"
-
 dependencies {
     implementation project(':banking-common')
     implementation project(':banking-onboarding')
