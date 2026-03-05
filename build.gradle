@@ -7,7 +7,7 @@ plugins {
 ext {
     springBootVersion = '4.0.3'
     springAiVersion   = '2.0.0-M2'
-    lombokVersion     = '1.18.36'
+    lombokVersion     = '1.18.42'
     mapstructVersion  = '1.6.3'
     testcontainersVer = '1.21.0'
 }
