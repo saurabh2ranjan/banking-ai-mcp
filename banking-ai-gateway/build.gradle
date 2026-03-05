@@ -2,6 +2,8 @@ plugins {
     id 'org.springframework.boot'
 }
 
+apply from: "${rootDir}/gradle/bom.gradle"
+
 dependencies {
     implementation project(':banking-common')
     implementation project(':banking-onboarding')
@@ -30,7 +32,7 @@ dependencies {
     // Jackson
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
 
-    // H2 for demo (replace with PostgreSQL in production)
+    // H2
     runtimeOnly 'com.h2database:h2'
 
     // Test
