@@ -1,0 +1,74 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot'         version '4.0.2' apply false
+    id 'io.spring.dependency-management'  version '1.1.7' apply false
+}
+
+ext {
+    springAiVersion    = '2.0.0'
+    lombokVersion      = '1.18.36'
+    mapstructVersion   = '1.6.3'
+    testcontainersVer  = '1.21.0'
+}
+
+allprojects {
+    group   = 'com.banking'
+    version = '1.0.0-SNAPSHOT'
+
+    repositories {
+        mavenCentral()
+        maven { url 'https://repo.spring.io/milestone' }
+        maven { url 'https://repo.spring.io/snapshot' }
+    }
+}
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'io.spring.dependency-management'
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+    }
+
+    dependencyManagement {
+        imports {
+            mavenBom "org.springframework.boot:spring-boot-dependencies:4.0.2"
+            mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+            mavenBom "org.testcontainers:testcontainers-bom:${testcontainersVer}"
+        }
+    }
+
+    dependencies {
+        // Lombok
+        compileOnly         "org.projectlombok:lombok:${lombokVersion}"
+        annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+        testCompileOnly     "org.projectlombok:lombok:${lombokVersion}"
+        testAnnotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+
+        // MapStruct
+        implementation      "org.mapstruct:mapstruct:${mapstructVersion}"
+        annotationProcessor "org.mapstruct:mapstruct-processor:${mapstructVersion}"
+        // Lombok + MapStruct ordering fix
+        annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+
+        // Test
+        testImplementation 'org.springframework.boot:spring-boot-starter-test'
+        testImplementation 'org.assertj:assertj-core'
+        testImplementation 'org.mockito:mockito-core'
+    }
+
+    tasks.withType(Test) {
+        useJUnitPlatform()
+        jvmArgs '-XX:+EnableDynamicAgentLoading'
+    }
+
+    tasks.withType(JavaCompile) {
+        options.encoding = 'UTF-8'
+        options.compilerArgs += [
+            '-Amapstruct.defaultComponentModel=spring',
+            '-parameters'
+        ]
+    }
+}
