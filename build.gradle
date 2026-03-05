@@ -1,10 +1,10 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot'         version '4.0.2' apply false
-    id 'io.spring.dependency-management'  version '1.1.7' apply false
+    id 'org.springframework.boot' version '4.0.3' apply false
 }
 
 ext {
+    springBootVersion  = '4.0.3'
     springAiVersion    = '2.0.0'
     lombokVersion      = '1.18.36'
     mapstructVersion   = '1.6.3'
@@ -24,22 +24,20 @@ allprojects {
 
 subprojects {
     apply plugin: 'java'
-    apply plugin: 'io.spring.dependency-management'
 
     java {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
-
-    dependencyManagement {
-        imports {
-            mavenBom "org.springframework.boot:spring-boot-dependencies:4.0.2"
-            mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
-            mavenBom "org.testcontainers:testcontainers-bom:${testcontainersVer}"
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(25)
         }
     }
 
     dependencies {
+        // BOMs — native Gradle platform() replaces io.spring.dependency-management plugin
+        // enforcedPlatform() overrides any conflicting transitive versions, matching Spring Boot plugin behaviour
+        implementation enforcedPlatform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}")
+        implementation enforcedPlatform("org.springframework.ai:spring-ai-bom:${springAiVersion}")
+        implementation enforcedPlatform("org.testcontainers:testcontainers-bom:${testcontainersVer}")
+
         // Lombok
         compileOnly         "org.projectlombok:lombok:${lombokVersion}"
         annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
@@ -58,12 +56,12 @@ subprojects {
         testImplementation 'org.mockito:mockito-core'
     }
 
-    tasks.withType(Test) {
+    tasks.withType(Test).configureEach {
         useJUnitPlatform()
         jvmArgs '-XX:+EnableDynamicAgentLoading'
     }
 
-    tasks.withType(JavaCompile) {
+    tasks.withType(JavaCompile).configureEach {
         options.encoding = 'UTF-8'
         options.compilerArgs += [
             '-Amapstruct.defaultComponentModel=spring',
