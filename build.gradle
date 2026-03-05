@@ -4,26 +4,18 @@ plugins {
 }
 
 ext {
-    springBootVersion  = '4.0.3'
-    springAiVersion    = '2.0.0-M2'
-    lombokVersion      = '1.18.36'
-    mapstructVersion   = '1.6.3'
-    testcontainersVer  = '1.21.0'
-}
-
-allprojects {
-    group   = 'com.banking'
-    version = '1.0.0-SNAPSHOT'
-
-    repositories {
-        mavenCentral()
-        maven { url 'https://repo.spring.io/milestone' }
-        maven { url 'https://repo.spring.io/snapshot' }
-    }
+    springBootVersion = '4.0.3'
+    springAiVersion   = '2.0.0-M2'
+    lombokVersion     = '1.18.36'
+    mapstructVersion  = '1.6.3'
+    testcontainersVer = '1.21.0'
 }
 
 subprojects {
     apply plugin: 'java'
+
+    group   = 'com.banking'
+    version = '1.0.0-SNAPSHOT'
 
     java {
         toolchain {
@@ -32,25 +24,26 @@ subprojects {
     }
 
     dependencies {
-        // BOMs — native Gradle platform() replaces io.spring.dependency-management plugin
-        // enforcedPlatform() overrides any conflicting transitive versions, matching Spring Boot plugin behaviour
-        implementation enforcedPlatform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}")
-        implementation enforcedPlatform("org.springframework.ai:spring-ai-bom:${springAiVersion}")
-        implementation enforcedPlatform("org.testcontainers:testcontainers-bom:${testcontainersVer}")
+        // ── BOMs ────────────────────────────────────────────────────────────────
+        // platform() declares version constraints from each BOM for the current
+        // configuration. All versionless coordinates in subproject build files
+        // are resolved against these BOMs.
+        implementation    platform("org.springframework.boot:spring-boot-dependencies:${rootProject.ext.springBootVersion}")
+        implementation    platform("org.springframework.ai:spring-ai-bom:${rootProject.ext.springAiVersion}")
+        implementation    platform("org.testcontainers:testcontainers-bom:${rootProject.ext.testcontainersVer}")
 
-        // Lombok
-        compileOnly         "org.projectlombok:lombok:${lombokVersion}"
-        annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
-        testCompileOnly     "org.projectlombok:lombok:${lombokVersion}"
-        testAnnotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+        // ── Lombok ──────────────────────────────────────────────────────────────
+        compileOnly             "org.projectlombok:lombok:${rootProject.ext.lombokVersion}"
+        annotationProcessor     "org.projectlombok:lombok:${rootProject.ext.lombokVersion}"
+        testCompileOnly         "org.projectlombok:lombok:${rootProject.ext.lombokVersion}"
+        testAnnotationProcessor "org.projectlombok:lombok:${rootProject.ext.lombokVersion}"
 
-        // MapStruct
-        implementation      "org.mapstruct:mapstruct:${mapstructVersion}"
-        annotationProcessor "org.mapstruct:mapstruct-processor:${mapstructVersion}"
-        // Lombok + MapStruct ordering fix
-        annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+        // ── MapStruct ───────────────────────────────────────────────────────────
+        implementation          "org.mapstruct:mapstruct:${rootProject.ext.mapstructVersion}"
+        annotationProcessor     "org.mapstruct:mapstruct-processor:${rootProject.ext.mapstructVersion}"
+        annotationProcessor      'org.projectlombok:lombok-mapstruct-binding:0.2.0'
 
-        // Test
+        // ── Test ────────────────────────────────────────────────────────────────
         testImplementation 'org.springframework.boot:spring-boot-starter-test'
         testImplementation 'org.assertj:assertj-core'
         testImplementation 'org.mockito:mockito-core'
