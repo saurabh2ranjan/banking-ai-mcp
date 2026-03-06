@@ -11,10 +11,6 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 
-/**
- * Base entity that all JPA entities extend.
- * Provides automatic auditing via Spring Data JPA.
- */
 @Getter
 @Setter
 @MappedSuperclass
@@ -23,11 +19,11 @@ public abstract class BaseEntity {
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private LocalDateTime createdAt = LocalDateTime.now();  // default prevents NOT NULL violation if auditing fires late
 
     @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
+    private LocalDateTime updatedAt = LocalDateTime.now();  // default prevents NOT NULL violation if auditing fires late
 
     @CreatedBy
     @Column(name = "created_by", updatable = false, length = 100)

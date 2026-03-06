@@ -32,7 +32,7 @@ public class PaymentDtos {
         LocalDateTime initiatedAt,
         LocalDateTime completedAt,
         String failureReason,
-        Double fraudScore,
+        BigDecimal fraudScore,
         String fraudRiskLevel
     ) {}
 

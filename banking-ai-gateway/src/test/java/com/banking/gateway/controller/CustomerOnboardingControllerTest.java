@@ -4,13 +4,13 @@ import com.banking.common.exception.BankingExceptions.*;
 import com.banking.onboarding.domain.Customer;
 import com.banking.onboarding.dto.CustomerDtos.*;
 import com.banking.onboarding.service.CustomerOnboardingService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.http.MediaType;
@@ -35,7 +35,7 @@ class CustomerOnboardingControllerTest {
     @Autowired MockMvc     mockMvc;
     @Autowired ObjectMapper objectMapper;
 
-    @MockBean CustomerOnboardingService onboardingService;
+    @MockitoBean CustomerOnboardingService onboardingService;
 
     // ─── Fixtures ─────────────────────────────────────────────────────────────
 

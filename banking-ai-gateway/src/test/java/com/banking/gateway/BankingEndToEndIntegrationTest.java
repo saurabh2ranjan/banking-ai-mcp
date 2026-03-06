@@ -16,6 +16,7 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +32,7 @@ import static org.assertj.core.api.Assertions.*;
  */
 @SpringBootTest
 @ActiveProfiles("test")
+@Import(SharedAiTestConfig.class)
 @Transactional
 @DisplayName("Banking Platform — End-to-End Integration Tests")
 class BankingEndToEndIntegrationTest {
@@ -117,7 +119,7 @@ class BankingEndToEndIntegrationTest {
         assertThat(account.status()).isEqualTo("ACTIVE");
         assertThat(account.accountType()).isEqualTo("SAVINGS");
         assertThat(account.interestRate()).isEqualByComparingTo("0.0350");
-        assertThat(account.minimumBalance()).isEqualByComparingTo("500.00");
+        assertThat(account.minimumBalance()).isEqualByComparingTo("100.00");
     }
 
     // ─── 3. KYC rejection ────────────────────────────────────────────────────
@@ -200,7 +202,7 @@ class BankingEndToEndIntegrationTest {
     @DisplayName("Safe IMPS payment: hold applied, fraud APPROVE, balances updated correctly")
     void fullPaymentLifecycle_safePayment() {
         String aliceId = onboardAndComplete("alice.pay@example.com", "+447700901001", "ALICE1234F");
-        String bobId   = onboardAndComplete("bob.pay@example.com",   "+447700901002", "BOB001234G");
+        String bobId   = onboardAndComplete("bob.pay@example.com",   "+447700901002", "BOBZA1234G");
         String aliceAccId = openAccount(aliceId, Account.AccountType.CURRENT, new BigDecimal("20000"), "GBP");
         String bobAccId   = openAccount(bobId,   Account.AccountType.CURRENT, new BigDecimal("5000"),  "GBP");
 
@@ -238,7 +240,7 @@ class BankingEndToEndIntegrationTest {
     @DisplayName("Payment rejected when source account has insufficient funds")
     void payment_insufficientFunds() {
         String aliceId = onboardAndComplete("alice.insuf@example.com", "+447700901010", "ALICB1234F");
-        String bobId   = onboardAndComplete("bob.insuf@example.com",   "+447700901011", "BOBB01234G");
+        String bobId   = onboardAndComplete("bob.insuf@example.com",   "+447700901011", "BOBBA1234G");
         String aliceAccId = openAccount(aliceId, Account.AccountType.SAVINGS, new BigDecimal("1000"), "GBP");
         String bobAccId   = openAccount(bobId,   Account.AccountType.SAVINGS, new BigDecimal("500"),  "GBP");
 
@@ -258,7 +260,7 @@ class BankingEndToEndIntegrationTest {
     @DisplayName("Completed payment can be reversed — money returns to source")
     void paymentReversal() {
         String aliceId = onboardAndComplete("alice.rev@example.com", "+447700902001", "ALICC1234F");
-        String bobId   = onboardAndComplete("bob.rev@example.com",   "+447700902002", "BOBC01234G");
+        String bobId   = onboardAndComplete("bob.rev@example.com",   "+447700902002", "BOBCA1234G");
         String aliceAccId = openAccount(aliceId, Account.AccountType.CURRENT, new BigDecimal("10000"), "GBP");
         String bobAccId   = openAccount(bobId,   Account.AccountType.CURRENT, new BigDecimal("500"),   "GBP");
 
@@ -286,7 +288,7 @@ class BankingEndToEndIntegrationTest {
     @DisplayName("Cannot reverse a non-completed (e.g. PENDING_FRAUD_CHECK) payment")
     void reversal_nonCompletedPayment_throwsPaymentException() {
         String aliceId = onboardAndComplete("alice.rev2@example.com", "+447700902010", "ALICD1234F");
-        String bobId   = onboardAndComplete("bob.rev2@example.com",   "+447700902011", "BOBD01234G");
+        String bobId   = onboardAndComplete("bob.rev2@example.com",   "+447700902011", "BOBDA1234G");
         String aliceAccId = openAccount(aliceId, Account.AccountType.CURRENT, new BigDecimal("10000"), "GBP");
         String bobAccId   = openAccount(bobId,   Account.AccountType.CURRENT, new BigDecimal("1000"),  "GBP");
 
@@ -306,7 +308,7 @@ class BankingEndToEndIntegrationTest {
     @DisplayName("High-value SWIFT triggers fraud hold; hold released when payment fails")
     void fraudHoldWorkflow() {
         String aliceId = onboardAndComplete("alice.fraud@example.com", "+447700903001", "ALICF1234F");
-        String bobId   = onboardAndComplete("bob.fraud@example.com",   "+447700903002", "BOBF01234G");
+        String bobId   = onboardAndComplete("bob.fraud@example.com",   "+447700903002", "BOBFA1234G");
         String aliceAccId = openAccount(aliceId, Account.AccountType.CURRENT, new BigDecimal("500000"), "GBP");
         String bobAccId   = openAccount(bobId,   Account.AccountType.CURRENT, new BigDecimal("1000"),   "GBP");
 
@@ -389,7 +391,7 @@ class BankingEndToEndIntegrationTest {
     @DisplayName("Daily spending summary reflects correct totals after multiple payments")
     void dailySpendingSummary_reflectsPayments() {
         String aliceId = onboardAndComplete("alice.daily@example.com", "+447700906001", "ALICI1234F");
-        String bobId   = onboardAndComplete("bob.daily@example.com",   "+447700906002", "BOBG01234G");
+        String bobId   = onboardAndComplete("bob.daily@example.com",   "+447700906002", "BOBGA1234G");
         String aliceAccId = openAccount(aliceId, Account.AccountType.CURRENT, new BigDecimal("50000"), "GBP");
         String bobAccId   = openAccount(bobId,   Account.AccountType.CURRENT, new BigDecimal("1000"),  "GBP");
 
@@ -418,7 +420,7 @@ class BankingEndToEndIntegrationTest {
     @DisplayName("Customer can be retrieved by ID and by email with correct field values")
     void customerQueries_byIdAndEmail() {
         OnboardingResponse ob = onboardingService.initiateOnboarding(
-                buildOnboardingRequest("query.test@example.com", "+447700907001", "QUERYA1234F", null));
+                buildOnboardingRequest("query.test@example.com", "+447700907001", "QUERY1234F", null));
 
         CustomerResponse byId = onboardingService.getCustomer(ob.customerId());
         assertThat(byId.email()).isEqualTo("query.test@example.com");
@@ -448,8 +450,8 @@ class BankingEndToEndIntegrationTest {
     @Test
     @DisplayName("Small domestic IMPS payment receives APPROVE decision with low score")
     void fraudAnalysis_smallPayment_isApproved() {
-        String aliceId = onboardAndComplete("alice.safe@example.com", "+447700908001", "ALICEJ1234F");
-        String bobId   = onboardAndComplete("bob.safe@example.com",   "+447700908002", "BOBH01234G");
+        String aliceId = onboardAndComplete("alice.safe@example.com", "+447700908001", "ALICJ1234F");
+        String bobId   = onboardAndComplete("bob.safe@example.com",   "+447700908002", "BOBHA1234G");
         String aliceAccId = openAccount(aliceId, Account.AccountType.CURRENT, new BigDecimal("10000"), "GBP");
         String bobAccId   = openAccount(bobId,   Account.AccountType.CURRENT, new BigDecimal("500"),   "GBP");
 
@@ -470,9 +472,9 @@ class BankingEndToEndIntegrationTest {
     @DisplayName("getPendingKycCustomers returns customers with UNDER_REVIEW status")
     void pendingKycQueue_returnsUnderReviewCustomers() {
         OnboardingResponse ob1 = onboardingService.initiateOnboarding(
-                buildOnboardingRequest("pending1@example.com", "+447700909001", "PENDA01234F", null));
+                buildOnboardingRequest("pending1@example.com", "+447700909001", "PENDA1234F", null));
         OnboardingResponse ob2 = onboardingService.initiateOnboarding(
-                buildOnboardingRequest("pending2@example.com", "+447700909002", "PENDB01234G", null));
+                buildOnboardingRequest("pending2@example.com", "+447700909002", "PENDB1234G", null));
 
         onboardingService.updateKycStatus(
                 new KycUpdateRequest(ob1.customerId(), Customer.KycStatus.UNDER_REVIEW, null));
@@ -490,8 +492,8 @@ class BankingEndToEndIntegrationTest {
     @Test
     @DisplayName("Three sequential payments reduce balance cumulatively")
     void multiplePayments_cumulativeBalanceReduction() {
-        String aliceId = onboardAndComplete("alice.seq@example.com", "+447700910001", "ALICEK1234F");
-        String bobId   = onboardAndComplete("bob.seq@example.com",   "+447700910002", "BOBJ01234G");
+        String aliceId = onboardAndComplete("alice.seq@example.com", "+447700910001", "ALCEK1234F");
+        String bobId   = onboardAndComplete("bob.seq@example.com",   "+447700910002", "BOBJX1234G");
         String aliceAccId = openAccount(aliceId, Account.AccountType.CURRENT, new BigDecimal("30000"), "GBP");
         String bobAccId   = openAccount(bobId,   Account.AccountType.CURRENT, new BigDecimal("1000"),  "GBP");
 
@@ -511,8 +513,8 @@ class BankingEndToEndIntegrationTest {
     @Test
     @DisplayName("Existing hold reduces available funds and prevents further overspend")
     void existingHold_preventsFurtherOverspend() {
-        String aliceId = onboardAndComplete("alice.holds@example.com", "+447700911001", "ALICEL1234F");
-        String bobId   = onboardAndComplete("bob.holds@example.com",   "+447700911002", "BOBK01234G");
+        String aliceId = onboardAndComplete("alice.holds@example.com", "+447700911001", "ALCEL1234F");
+        String bobId   = onboardAndComplete("bob.holds@example.com",   "+447700911002", "BOBKX1234G");
         String aliceAccId = openAccount(aliceId, Account.AccountType.CURRENT, new BigDecimal("5000"), "GBP");
         String bobAccId   = openAccount(bobId,   Account.AccountType.CURRENT, new BigDecimal("500"),  "GBP");
 

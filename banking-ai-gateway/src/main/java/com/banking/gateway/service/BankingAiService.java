@@ -11,16 +11,6 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Manages multi-turn conversations with session isolation.
- * Each sessionId maintains its own message history.
- *
- * Production considerations:
- * - Use Redis (via Spring Data Redis) for distributed session storage
- * - Set TTL on sessions (e.g. 30 min inactivity)
- * - Store sessions per authenticated user, not per arbitrary sessionId
- * - Consider Spring Session for HTTP session management
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -28,9 +18,8 @@ public class BankingAiService {
 
     private final ChatClient bankingChatClient;
 
-    // In-memory sessions — replace with Redis in production
     private final Map<String, List<Message>> sessions = new ConcurrentHashMap<>();
-    private static final int MAX_HISTORY_SIZE = 50;   // Prevent unbounded growth
+    private static final int MAX_HISTORY_SIZE = 50;
     private static final int MAX_SESSIONS     = 1000;
 
     public String chat(String sessionId, String userMessage) {
@@ -47,6 +36,7 @@ public class BankingAiService {
                 .call()
                 .content();
 
+        assert response != null;
         history.add(new AssistantMessage(response));
         log.info("[Session:{}] AI replied ({} chars)", sessionId, response.length());
         return response;
@@ -84,13 +74,12 @@ public class BankingAiService {
 
     private void trimHistory(List<Message> history) {
         while (history.size() > MAX_HISTORY_SIZE) {
-            history.remove(0);  // Drop oldest messages
+            history.removeFirst();
         }
     }
 
     private void enforceSessionLimit() {
         if (sessions.size() >= MAX_SESSIONS) {
-            // Evict the oldest session
             sessions.keySet().stream().findFirst().ifPresent(sessions::remove);
         }
     }

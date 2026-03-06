@@ -36,7 +36,7 @@ public class Account extends BaseEntity {
     @Column(name = "customer_id", nullable = false, length = 20)
     private String customerId;        // Cross-module ref (not JPA FK)
 
-    @Column(name = "account_number", nullable = false, unique = true, length = 20)
+    @Column(name = "account_number", nullable = false, unique = true, length = 34)
     private String accountNumber;     // IBAN/BBAN formatted
 
     @Column(name = "display_name", length = 100)

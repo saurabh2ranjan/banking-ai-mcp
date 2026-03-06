@@ -69,7 +69,7 @@ public class Payment extends BaseEntity {
     private String failureReason;
 
     @Column(name = "fraud_score", precision = 4, scale = 3)
-    private Double fraudScore;
+    private BigDecimal fraudScore;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "fraud_risk_level", length = 10)

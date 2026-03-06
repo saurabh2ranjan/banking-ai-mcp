@@ -115,7 +115,11 @@ Six independent rules scored and summed (capped at 1.0):
 export OPENAI_API_KEY=sk-your-key-here
 export BANKING_API_KEY=my-secret-key        # optional, default: banking-demo-key-2024
 
+# Run with demo data (Alice, Bob, Charlie pre-seeded):
 cd banking-ai-gateway
+SPRING_PROFILES_ACTIVE=dev ../gradlew bootRun
+
+# Run without demo data (clean slate):
 ../gradlew bootRun
 ```
 

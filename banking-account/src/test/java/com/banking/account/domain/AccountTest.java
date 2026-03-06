@@ -66,7 +66,7 @@ class AccountTest {
             account.setSingleTransactionLimit(new BigDecimal("1000.00"));
             assertThatThrownBy(() -> account.debit(new BigDecimal("1001.00")))
                     .isInstanceOf(PaymentException.class)
-                    .hasMessageContaining("SINGLE_TXN_LIMIT_EXCEEDED");
+                    .hasMessageContaining("exceeds single transaction limit");
         }
 
         @Test void atSingleTransactionLimit_succeeds() {

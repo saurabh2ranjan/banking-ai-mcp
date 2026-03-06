@@ -8,15 +8,12 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
+import org.springframework.aop.framework.AopProxyUtils;
+import org.springframework.aop.support.AopUtils;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Wires all MCP tools from every module into the Spring AI ChatClient.
- *
- * The SYSTEM_PROMPT defines the AI's identity, capability boundaries,
- * and the strict decision rules it must follow when handling payments and fraud.
- */
 @Configuration
 public class BankingAiConfig {
 
@@ -61,15 +58,15 @@ public class BankingAiConfig {
             • get_fraud_decision_guidance   — Plain-English guidance for compliance officers
 
             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            ⚖️ MANDATORY RULES — YOU MUST FOLLOW THESE
+            ⚖️  MANDATORY RULES — YOU MUST FOLLOW THESE
             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             1. ONBOARDING: A customer must complete KYC verification before any account can be opened.
             2. ACCOUNT OPENING: Always verify the customer exists and KYC is VERIFIED before opening an account.
             3. PRE-PAYMENT: Always validate both accounts are active and source has sufficient funds before initiating.
             4. FRAUD CHECK: ALWAYS run analyse_payment_fraud_risk before calling process_payment.
-               - Score < 0.40  → APPROVE:         call process_payment
-               - Score 0.40–0.70 → HOLD:          call hold_payment_for_fraud
-               - Score ≥ 0.70  → BLOCK:           call hold_payment_for_fraud AND consider block_account
+               - Score < 0.40  → APPROVE:      call process_payment
+               - Score 0.40–0.70 → HOLD:       call hold_payment_for_fraud
+               - Score ≥ 0.70  → BLOCK:        call hold_payment_for_fraud AND consider block_account
             5. TRANSPARENCY: Always tell the user exactly which tools you called and what each returned.
             6. AUDIT TRAIL: When blocking an account, always provide a clear, specific reason.
             7. HUMAN ESCALATION: Any FRAUD_HOLD or BLOCK must mention that a human reviewer will be notified.
@@ -80,22 +77,44 @@ public class BankingAiConfig {
             Be professional, precise, and always prioritise customer safety over transaction speed.
             """;
 
+    /**
+     * Only created when a real ChatModel is present (i.e. OpenAI autoconfiguration is active).
+     * In tests, OpenAI is excluded — this bean is skipped and the nested AiTestConfig
+     * in each @SpringBootTest class provides mock beans instead. No conflict, no overriding needed.
+     */
     @Bean
+    @ConditionalOnMissingBean(ToolCallbackProvider.class)
     public ToolCallbackProvider allBankingMcpTools(
             OnboardingMcpTool onboardingMcpTool,
             AccountMcpTool    accountMcpTool,
             PaymentMcpTool    paymentMcpTool,
             FraudMcpTool      fraudMcpTool) {
+
         return MethodToolCallbackProvider.builder()
-                .toolObjects(onboardingMcpTool, accountMcpTool, paymentMcpTool, fraudMcpTool)
+                .toolObjects(
+                    unwrap(onboardingMcpTool),
+                    unwrap(accountMcpTool),
+                    unwrap(paymentMcpTool),
+                    unwrap(fraudMcpTool))
                 .build();
     }
 
     @Bean
-    public ChatClient bankingChatClient(ChatModel chatModel, ToolCallbackProvider allBankingMcpTools) {
+    @ConditionalOnMissingBean(ChatClient.class)
+    public ChatClient bankingChatClient(ChatModel chatModel,
+                                        ToolCallbackProvider allBankingMcpTools) {
         return ChatClient.builder(chatModel)
                 .defaultSystem(SYSTEM_PROMPT)
-                .defaultTools(allBankingMcpTools)
+                .defaultToolCallbacks(allBankingMcpTools)
                 .build();
+    }
+
+    private Object unwrap(Object bean) {
+        try {
+            if (AopUtils.isAopProxy(bean)) {
+                return AopProxyUtils.getSingletonTarget(bean);
+            }
+        } catch (Exception ignored) {}
+        return bean;
     }
 }

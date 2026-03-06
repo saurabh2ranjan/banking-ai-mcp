@@ -51,6 +51,11 @@ subprojects {
         testImplementation 'org.springframework.boot:spring-boot-starter-test'
         testImplementation 'org.assertj:assertj-core'
         testImplementation 'org.mockito:mockito-core'
+
+        // Gradle 9 requires junit-platform-launcher explicitly on the test runtime classpath.
+        // spring-boot-starter-test pulls in junit-jupiter but NOT the launcher —
+        // without this Gradle's test executor cannot start.
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     }
 
     tasks.withType(Test).configureEach {

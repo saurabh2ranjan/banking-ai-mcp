@@ -198,8 +198,8 @@ public class AccountService {
 
     private BigDecimal minimumBalanceFor(Account.AccountType type) {
         return switch (type) {
-            case SAVINGS -> new BigDecimal("500");
-            case CURRENT -> new BigDecimal("5000");
+            case SAVINGS -> new BigDecimal("100");   // nominal minimum for savings
+            case CURRENT -> BigDecimal.ZERO;          // current/checking: no minimum
             default      -> BigDecimal.ZERO;
         };
     }

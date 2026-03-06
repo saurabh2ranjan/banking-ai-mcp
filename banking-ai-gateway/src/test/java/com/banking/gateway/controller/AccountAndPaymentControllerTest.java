@@ -7,13 +7,13 @@ import com.banking.common.exception.BankingExceptions.*;
 import com.banking.payment.domain.Payment;
 import com.banking.payment.dto.PaymentDtos.*;
 import com.banking.payment.service.PaymentService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.http.MediaType;
@@ -39,8 +39,8 @@ class AccountAndPaymentControllerTest {
 
     @Autowired MockMvc      mockMvc;
     @Autowired ObjectMapper objectMapper;
-    @MockBean  AccountService  accountService;
-    @MockBean  PaymentService  paymentService;
+    @MockitoBean  AccountService  accountService;
+    @MockitoBean  PaymentService  paymentService;
 
     private static final String API_KEY = "banking-demo-key-2024";
 

@@ -188,7 +188,7 @@ class PaymentServiceTest {
             paymentService.holdForFraud("PAY-001", 0.65, Payment.FraudRiskLevel.HIGH, "High velocity");
 
             assertThat(payment.getStatus()).isEqualTo(Payment.PaymentStatus.FRAUD_HOLD);
-            assertThat(payment.getFraudScore()).isEqualTo(0.65);
+            assertThat(payment.getFraudScore()).isEqualByComparingTo(BigDecimal.valueOf(0.65));
             assertThat(payment.getFraudRiskLevel()).isEqualTo(Payment.FraudRiskLevel.HIGH);
             assertThat(payment.getFailureReason()).isEqualTo("High velocity");
 

@@ -3,6 +3,8 @@ package com.banking.onboarding.domain;
 import com.banking.common.domain.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDate;
 
@@ -18,6 +20,7 @@ public class CustomerDocument extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
+    @JdbcTypeCode(SqlTypes.VARCHAR)  // force VARCHAR(36) not BINARY(16)
     private String documentId;
 
     @ManyToOne(fetch = FetchType.LAZY)

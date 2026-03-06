@@ -10,7 +10,7 @@ import java.util.List;
 public record PagedResponse<T>(
         boolean         success,
         String          message,
-        List<T>         data,
+        List<T>         content,        // named 'content' to match Spring Page convention
         int             page,
         int             size,
         long            totalElements,

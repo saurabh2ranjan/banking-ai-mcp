@@ -78,8 +78,8 @@ public class CustomerDtos {
         @NotBlank @Size(min = 3, max = 3) String country
     ) {}
 
-    public record KycUpdateRequest(
-        @NotBlank String customerId,
+    public record KycUpdateRequest(// After — no constraint; controller populates it from @PathVariable before calling service
+                                   String customerId,   // populated from path variable by controller, not from request body
         @NotNull Customer.KycStatus kycStatus,
         String rejectionReason
     ) {}

@@ -151,7 +151,7 @@ class AccountServiceTest {
 
             Account saved = cap.getValue();
             assertThat(saved.getInterestRate()).isEqualByComparingTo("0.0350");
-            assertThat(saved.getMinimumBalance()).isEqualByComparingTo("500");
+            assertThat(saved.getMinimumBalance()).isEqualByComparingTo("100");
             assertThat(saved.getDailyDebitLimit()).isEqualByComparingTo("10000");
         }
 

@@ -120,12 +120,12 @@ class PaymentTest {
     @DisplayName("Fraud score and risk level can be set after creation")
     void fraudFieldsCanBeMutated() {
         Payment p = buildPayment(Payment.PaymentStatus.PENDING_FRAUD_CHECK);
-        p.setFraudScore(0.72);
+        p.setFraudScore(BigDecimal.valueOf(0.72));
         p.setFraudRiskLevel(Payment.FraudRiskLevel.CRITICAL);
         p.setStatus(Payment.PaymentStatus.FRAUD_HOLD);
         p.setFailureReason("Blocked: critical score");
 
-        assertThat(p.getFraudScore()).isEqualTo(0.72);
+        assertThat(p.getFraudScore()).isEqualByComparingTo(BigDecimal.valueOf(0.72));
         assertThat(p.getFraudRiskLevel()).isEqualTo(Payment.FraudRiskLevel.CRITICAL);
         assertThat(p.getStatus()).isEqualTo(Payment.PaymentStatus.FRAUD_HOLD);
         assertThat(p.getFailureReason()).isEqualTo("Blocked: critical score");

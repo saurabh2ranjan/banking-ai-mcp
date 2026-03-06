@@ -25,7 +25,7 @@ import java.time.LocalDateTime;
 @Slf4j
 @Configuration
 @RequiredArgsConstructor
-@Profile("!prod")
+@Profile("dev")
 public class DataInitConfig {
 
     @Bean
