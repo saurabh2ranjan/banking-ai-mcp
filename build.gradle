@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'jacoco'
     id 'org.springframework.boot'            version '4.0.3' apply false
     id 'io.spring.dependency-management'     version '1.1.7' apply false
 }
@@ -14,10 +15,15 @@ ext {
 
 subprojects {
     apply plugin: 'java'
+    apply plugin: 'jacoco'
     apply plugin: 'io.spring.dependency-management'
 
     group   = 'com.banking'
     version = '1.0.0-SNAPSHOT'
+
+    jacoco {
+        toolVersion = "0.8.14"
+    }
 
     java {
         toolchain {
@@ -61,6 +67,39 @@ subprojects {
     tasks.withType(Test).configureEach {
         useJUnitPlatform()
         jvmArgs '-XX:+EnableDynamicAgentLoading'
+        jvmArgs '--enable-native-access=ALL-UNNAMED' // ← added for Java 25 + JaCoCo
+        finalizedBy jacocoTestReport
+    }
+
+    jacocoTestReport {
+        dependsOn test
+        reports {
+            html.required = true
+            xml.required  = true
+            csv.required  = false
+        }
+        // exclude classes that don't need coverage measurement
+        afterEvaluate {
+            classDirectories.setFrom(files(classDirectories.files.collect {
+                fileTree(dir: it, exclude: [
+                        '**/domain/**',
+                        '**/dto/**',
+                        '**/config/**',
+                        '**/*Application*',
+                        '**/exception/**'
+                ])
+            }))
+        }
+    }
+
+    jacocoTestCoverageVerification {                     // ← ADD HERE
+        violationRules {
+            rule {
+                limit {
+                    minimum = 0.70  // 70% minimum — adjust as needed
+                }
+            }
+        }
     }
 
     tasks.withType(JavaCompile).configureEach {
@@ -69,5 +108,24 @@ subprojects {
             '-Amapstruct.defaultComponentModel=spring',
             '-parameters'
         ]
+    }
+}
+
+tasks.register('jacocoRootReport', JacocoReport) {
+    dependsOn subprojects.collect { it.tasks.withType(Test) }
+
+    additionalSourceDirs.setFrom(subprojects.collect { it.sourceSets.main.allSource.srcDirs })
+    sourceDirectories.setFrom(subprojects.collect { it.sourceSets.main.allSource.srcDirs })
+    classDirectories.setFrom(subprojects.collect { it.sourceSets.main.output })
+    executionData.setFrom(subprojects.collect { it.tasks.withType(Test) }
+            .flatten()
+            .findAll { it.jacoco.destinationFile.exists() }
+            .collect { it.jacoco.destinationFile })
+
+    reports {
+        html.required = true
+        html.outputLocation = file("${rootProject.buildDir}/reports/jacoco/root/html")
+        xml.required  = true
+        xml.outputLocation = file("${rootProject.buildDir}/reports/jacoco/root/jacocoRootReport.xml")
     }
 }
