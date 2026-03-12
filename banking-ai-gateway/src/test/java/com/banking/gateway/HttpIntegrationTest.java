@@ -7,15 +7,15 @@ import com.banking.onboarding.dto.CustomerDtos.*;
 import com.banking.onboarding.service.CustomerOnboardingService;
 import com.banking.payment.domain.Payment;
 import com.banking.payment.dto.PaymentDtos.InitiatePaymentRequest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,10 +43,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class HttpIntegrationTest {
 
     @Autowired MockMvc      mockMvc;
-    @Autowired ObjectMapper objectMapper;
+    @Autowired ObjectMapper              objectMapper;
     @Autowired CustomerOnboardingService onboardingService;
 
-    private static final String API_KEY = "test-api-key";
+    private static final String API_KEY   = "test-api-key";
     private static final String ONBOARDING = "/api/v1/onboarding";
     private static final String ACCOUNTS   = "/api/v1/accounts";
     private static final String PAYMENTS   = "/api/v1/payments";
@@ -60,9 +60,7 @@ class HttpIntegrationTest {
 
     // ─── Fixture helpers ──────────────────────────────────────────────────────
 
-    private String toJson(Object obj) throws Exception {
-        return objectMapper.writeValueAsString(obj);
-    }
+    private String toJson(Object obj) throws Exception { return objectMapper.writeValueAsString(obj); }
 
     private OnboardingRequest validOnboardingRequest(String email, String mobile, String pan) {
         return new OnboardingRequest(
@@ -72,13 +70,11 @@ class HttpIntegrationTest {
             Customer.IdDocumentType.PAN_CARD, LocalDate.of(2032, 12, 31),
             new AddressRequest("123 High Street", null, "London", "England", "EC1A 1BB", "GBR"),
             Customer.EmploymentType.SALARIED, "Tech Corp",
-            new BigDecimal("80000"), "GBP", "SAVINGS"
-        );
+            new BigDecimal("80000"), "GBP", "SAVINGS");
     }
 
     private String onboardAndCompleteViaApi(String email, String mobile, String pan) throws Exception {
-        OnboardingResponse ob = onboardingService.initiateOnboarding(
-                validOnboardingRequest(email, mobile, pan));
+        OnboardingResponse ob = onboardingService.initiateOnboarding(validOnboardingRequest(email, mobile, pan));
         String id = ob.customerId();
         onboardingService.updateKycStatus(new KycUpdateRequest(id, Customer.KycStatus.VERIFIED, null));
         onboardingService.completeOnboarding(id);
@@ -93,25 +89,25 @@ class HttpIntegrationTest {
     @DisplayName("Authentication")
     class Authentication {
 
-        @Test
+    @Test
         @DisplayName("Missing API key → 401 Unauthorized")
-        void missingApiKey_returns401() throws Exception {
-            mockMvc.perform(get(ACCOUNTS + "/ACC-001"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
-        }
+    void missingApiKey_returns401() throws Exception {
+        mockMvc.perform(get(ACCOUNTS + "/ACC-001"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
+    }
 
-        @Test
+    @Test
         @DisplayName("Wrong API key → 401 Unauthorized")
-        void wrongApiKey_returns401() throws Exception {
-            mockMvc.perform(get(ACCOUNTS + "/ACC-001").header("X-API-Key", "wrong-key"))
-                .andExpect(status().isUnauthorized());
-        }
+    void wrongApiKey_returns401() throws Exception {
+        mockMvc.perform(get(ACCOUNTS + "/ACC-001").header("X-API-Key", "wrong-key"))
+            .andExpect(status().isUnauthorized());
+    }
 
-        @Test
+    @Test
         @DisplayName("Valid API key → request is processed (not 401)")
         void validApiKey_requestIsProcessed() throws Exception {
-            mockMvc.perform(withAuth(get(ACCOUNTS).param("customerId", "CUST-NONE")))
+        mockMvc.perform(withAuth(get(ACCOUNTS).param("customerId", "CUST-NONE")))
                 .andExpect(status().isOk());  // Empty list returned, not 401
         }
 
@@ -119,8 +115,8 @@ class HttpIntegrationTest {
         @DisplayName("Actuator health endpoint is accessible without API key")
         void actuatorHealth_noAuthRequired() throws Exception {
             mockMvc.perform(get("/actuator/health"))
-                .andExpect(status().isOk());
-        }
+            .andExpect(status().isOk());
+    }
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -131,55 +127,51 @@ class HttpIntegrationTest {
     @DisplayName("POST /api/v1/onboarding/customers — initiateOnboarding")
     class OnboardingInit {
 
-        @Test
+    @Test
         @DisplayName("Valid request → 201 with customerId and nextStep")
         void validRequest_returns201() throws Exception {
-            mockMvc.perform(withAuth(post(ONBOARDING + "/customers")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(toJson(validOnboardingRequest(
-                            "http.test@example.com", "+447700800001", "HTTPA1234F")))))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.customerId").value(startsWith("CUST-")))
-                .andExpect(jsonPath("$.data.status").value("INITIATED"))
-                .andExpect(jsonPath("$.data.nextStep").value("SUBMIT_DOCUMENTS"))
-                .andExpect(jsonPath("$.message").value("Onboarding initiated"));
-        }
+        mockMvc.perform(withAuth(post(ONBOARDING + "/customers")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(toJson(validOnboardingRequest("http.test@example.com", "+447700800001", "HTTPA1234F")))))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.customerId").value(startsWith("CUST-")))
+            .andExpect(jsonPath("$.data.status").value("INITIATED"))
+            .andExpect(jsonPath("$.data.nextStep").value("SUBMIT_DOCUMENTS"))
+            .andExpect(jsonPath("$.message").value("Onboarding initiated"));
+    }
 
-        @Test
+    @Test
         @DisplayName("Missing required fields → 400 with validation errors")
         void missingRequiredFields_returns400() throws Exception {
-            mockMvc.perform(withAuth(post(ONBOARDING + "/customers")
-                    .contentType(MediaType.APPLICATION_JSON)
+        mockMvc.perform(withAuth(post(ONBOARDING + "/customers")
+                .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"email\":\"test@example.com\"}")))  // missing many required fields
-                .andExpect(status().isBadRequest());
-        }
+            .andExpect(status().isBadRequest());
+    }
 
-        @Test
+    @Test
         @DisplayName("Duplicate email → 409 Conflict")
         void duplicateEmail_returns409() throws Exception {
             // Create first customer via service directly for efficiency
-            onboardingService.initiateOnboarding(
-                    validOnboardingRequest("dup.http@example.com", "+447700800010", "HTTPB1234F"));
+        onboardingService.initiateOnboarding(
+                validOnboardingRequest("dup.http@example.com", "+447700800010", "HTTPB1234F"));
+        mockMvc.perform(withAuth(post(ONBOARDING + "/customers")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(toJson(validOnboardingRequest("dup.http@example.com", "+447700800011", "HTTPC1234F")))))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.errorCode").value("DUPLICATE_RESOURCE"))
+            .andExpect(jsonPath("$.success").value(false));
+    }
 
-            mockMvc.perform(withAuth(post(ONBOARDING + "/customers")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(toJson(validOnboardingRequest(
-                            "dup.http@example.com", "+447700800011", "HTTPC1234F")))))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.errorCode").value("DUPLICATE_RESOURCE"))
-                .andExpect(jsonPath("$.success").value(false));
-        }
-
-        @Test
+    @Test
         @DisplayName("Invalid PAN format → 422 KYC Failed")
         void invalidPan_returns422() throws Exception {
-            mockMvc.perform(withAuth(post(ONBOARDING + "/customers")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(toJson(validOnboardingRequest(
-                            "badpan@example.com", "+447700800020", "INVALID_PAN")))))
-                .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.errorCode").value("KYC_FAILED"));
+        mockMvc.perform(withAuth(post(ONBOARDING + "/customers")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(toJson(validOnboardingRequest("badpan@example.com", "+447700800020", "INVALID_PAN")))))
+            .andExpect(status().isUnprocessableEntity())
+            .andExpect(jsonPath("$.errorCode").value("KYC_FAILED"));
         }
     }
 
@@ -191,26 +183,25 @@ class HttpIntegrationTest {
     @DisplayName("GET /api/v1/onboarding/customers/{id}")
     class GetCustomer {
 
-        @Test
+    @Test
         @DisplayName("Existing customer → 200 with customer data")
         void existingCustomer_returns200() throws Exception {
-            OnboardingResponse ob = onboardingService.initiateOnboarding(
-                    validOnboardingRequest("http.get@example.com", "+447700800030", "HTTPD1234F"));
+        OnboardingResponse ob = onboardingService.initiateOnboarding(
+                validOnboardingRequest("http.get@example.com", "+447700800030", "HTTPD1234F"));
+        mockMvc.perform(withAuth(get(ONBOARDING + "/customers/" + ob.customerId())))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.customerId").value(ob.customerId()))
+            .andExpect(jsonPath("$.data.email").value("http.get@example.com"))
+            .andExpect(jsonPath("$.data.kycStatus").value("PENDING"))
+            .andExpect(jsonPath("$.data.fullName").value("Alice Johnson"));
+    }
 
-            mockMvc.perform(withAuth(get(ONBOARDING + "/customers/" + ob.customerId())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.customerId").value(ob.customerId()))
-                .andExpect(jsonPath("$.data.email").value("http.get@example.com"))
-                .andExpect(jsonPath("$.data.kycStatus").value("PENDING"))
-                .andExpect(jsonPath("$.data.fullName").value("Alice Johnson"));
-        }
-
-        @Test
+    @Test
         @DisplayName("Unknown customer → 404 Not Found")
         void unknownCustomer_returns404() throws Exception {
-            mockMvc.perform(withAuth(get(ONBOARDING + "/customers/CUST-GHOST-999")))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+        mockMvc.perform(withAuth(get(ONBOARDING + "/customers/CUST-GHOST-999")))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
         }
     }
 
@@ -222,31 +213,29 @@ class HttpIntegrationTest {
     @DisplayName("PATCH /api/v1/onboarding/customers/{id}/kyc")
     class UpdateKyc {
 
-        @Test
+    @Test
         @DisplayName("Approve KYC → 200 with VERIFIED status")
         void approveKyc_returns200() throws Exception {
-            OnboardingResponse ob = onboardingService.initiateOnboarding(
-                    validOnboardingRequest("http.kyc@example.com", "+447700800040", "HTTPE1234F"));
+        OnboardingResponse ob = onboardingService.initiateOnboarding(
+                validOnboardingRequest("http.kyc@example.com", "+447700800040", "HTTPE1234F"));
+        mockMvc.perform(withAuth(patch(ONBOARDING + "/customers/" + ob.customerId() + "/kyc")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"kycStatus\":\"VERIFIED\"}")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.kycStatus").value("VERIFIED"))
+            .andExpect(jsonPath("$.data.onboardingStatus").value("KYC_VERIFIED"));
+    }
 
-            mockMvc.perform(withAuth(patch(ONBOARDING + "/customers/" + ob.customerId() + "/kyc")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"kycStatus\":\"VERIFIED\"}")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.kycStatus").value("VERIFIED"))
-                .andExpect(jsonPath("$.data.onboardingStatus").value("KYC_VERIFIED"));
-        }
-
-        @Test
+    @Test
         @DisplayName("Reject KYC with reason → 200 with REJECTED status")
         void rejectKyc_returns200() throws Exception {
-            OnboardingResponse ob = onboardingService.initiateOnboarding(
-                    validOnboardingRequest("http.kyc.rej@example.com", "+447700800041", "HTTPF1234F"));
-
-            mockMvc.perform(withAuth(patch(ONBOARDING + "/customers/" + ob.customerId() + "/kyc")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"kycStatus\":\"REJECTED\",\"rejectionReason\":\"Blurry document\"}")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.kycStatus").value("REJECTED"));
+        OnboardingResponse ob = onboardingService.initiateOnboarding(
+                validOnboardingRequest("http.kyc.rej@example.com", "+447700800041", "HTTPF1234F"));
+        mockMvc.perform(withAuth(patch(ONBOARDING + "/customers/" + ob.customerId() + "/kyc")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"kycStatus\":\"REJECTED\",\"rejectionReason\":\"Blurry document\"}")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.kycStatus").value("REJECTED"));
         }
     }
 
@@ -258,43 +247,38 @@ class HttpIntegrationTest {
     @DisplayName("POST /api/v1/accounts — openAccount")
     class OpenAccountHttp {
 
-        @Test
+    @Test
         @DisplayName("KYC-verified completed customer → 201 with account details")
         void validCustomer_returns201() throws Exception {
             String customerId = onboardAndCompleteViaApi(
                     "acc.open@example.com", "+447700800050", "HTTPG1234F");
 
-            OpenAccountRequest req = new OpenAccountRequest(
-                    customerId, Account.AccountType.SAVINGS, "GBP",
-                    "Test Savings", new BigDecimal("10000"), null, null);
+        OpenAccountRequest req = new OpenAccountRequest(
+                customerId, Account.AccountType.SAVINGS, "GBP", "Test Savings",
+                new BigDecimal("10000"), null, null);
+        mockMvc.perform(withAuth(post(ACCOUNTS)
+                .contentType(MediaType.APPLICATION_JSON).content(toJson(req))))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.customerId").value(customerId))
+            .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+            .andExpect(jsonPath("$.data.accountType").value("SAVINGS"))
+            .andExpect(jsonPath("$.data.balance").value(10000))
+            .andExpect(jsonPath("$.data.holdAmount").value(0))
+            .andExpect(jsonPath("$.message").value("Account opened successfully"));
+    }
 
-            mockMvc.perform(withAuth(post(ACCOUNTS)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(toJson(req))))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.customerId").value(customerId))
-                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
-                .andExpect(jsonPath("$.data.accountType").value("SAVINGS"))
-                .andExpect(jsonPath("$.data.balance").value(10000))
-                .andExpect(jsonPath("$.data.holdAmount").value(0))
-                .andExpect(jsonPath("$.message").value("Account opened successfully"));
-        }
-
-        @Test
+    @Test
         @DisplayName("KYC not verified → 400 with ONBOARDING_FAILED")
         void kycNotVerified_returns400() throws Exception {
-            OnboardingResponse ob = onboardingService.initiateOnboarding(
-                    validOnboardingRequest("acc.nokyc@example.com", "+447700800060", "HTTPH1234F"));
-
-            OpenAccountRequest req = new OpenAccountRequest(
-                    ob.customerId(), Account.AccountType.SAVINGS, "GBP", null, null, null, null);
-
-            mockMvc.perform(withAuth(post(ACCOUNTS)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(toJson(req))))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("ONBOARDING_FAILED"));
+        OnboardingResponse ob = onboardingService.initiateOnboarding(
+                validOnboardingRequest("acc.nokyc@example.com", "+447700800060", "HTTPH1234F"));
+        OpenAccountRequest req = new OpenAccountRequest(
+                ob.customerId(), Account.AccountType.SAVINGS, "GBP", null, null, null, null);
+        mockMvc.perform(withAuth(post(ACCOUNTS)
+                .contentType(MediaType.APPLICATION_JSON).content(toJson(req))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.errorCode").value("ONBOARDING_FAILED"));
         }
     }
 
@@ -302,7 +286,7 @@ class HttpIntegrationTest {
     @DisplayName("GET /api/v1/accounts/{accountId}")
     class GetAccountHttp {
 
-        @Test
+    @Test
         @DisplayName("Existing account → 200 with full account details")
         void existingAccount_returns200() throws Exception {
             String customerId = onboardAndCompleteViaApi(
@@ -313,19 +297,19 @@ class HttpIntegrationTest {
 
             String accountId = extractAccountId(toJson(req), customerId);
 
-            mockMvc.perform(withAuth(get(ACCOUNTS + "/" + accountId)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.accountId").value(accountId))
-                .andExpect(jsonPath("$.data.balance").value(5000))
-                .andExpect(jsonPath("$.data.currency").value("GBP"));
-        }
+        mockMvc.perform(withAuth(get(ACCOUNTS + "/" + accountId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.accountId").value(accountId))
+            .andExpect(jsonPath("$.data.balance").value(5000))
+            .andExpect(jsonPath("$.data.currency").value("GBP"));
+    }
 
-        @Test
+    @Test
         @DisplayName("Unknown account → 404")
         void unknownAccount_returns404() throws Exception {
-            mockMvc.perform(withAuth(get(ACCOUNTS + "/ACC-GHOST-999")))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+        mockMvc.perform(withAuth(get(ACCOUNTS + "/ACC-GHOST-999")))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
         }
     }
 
@@ -333,20 +317,20 @@ class HttpIntegrationTest {
     @DisplayName("GET /api/v1/accounts/{id}/balance")
     class GetBalanceHttp {
 
-        @Test
+    @Test
         @DisplayName("Returns balance with hold breakdown")
         void returnsBalance() throws Exception {
             String customerId = onboardAndCompleteViaApi(
                     "bal.get@example.com", "+447700800080", "HTTPJ1234F");
             String accountId  = openAccountViaService(customerId, new BigDecimal("8000"));
 
-            mockMvc.perform(withAuth(get(ACCOUNTS + "/" + accountId + "/balance")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.balance").value(8000))
-                .andExpect(jsonPath("$.data.availableBalance").value(8000))
-                .andExpect(jsonPath("$.data.holdAmount").value(0))
-                .andExpect(jsonPath("$.data.currency").value("GBP"))
-                .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+        mockMvc.perform(withAuth(get(ACCOUNTS + "/" + accountId + "/balance")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.balance").value(8000))
+            .andExpect(jsonPath("$.data.availableBalance").value(8000))
+            .andExpect(jsonPath("$.data.holdAmount").value(0))
+            .andExpect(jsonPath("$.data.currency").value("GBP"))
+            .andExpect(jsonPath("$.data.status").value("ACTIVE"));
         }
     }
 
@@ -354,7 +338,7 @@ class HttpIntegrationTest {
     @DisplayName("GET /api/v1/accounts?customerId=...")
     class GetCustomerAccountsHttp {
 
-        @Test
+    @Test
         @DisplayName("Returns list of customer's accounts")
         void returnsAccountList() throws Exception {
             String customerId = onboardAndCompleteViaApi(
@@ -362,17 +346,17 @@ class HttpIntegrationTest {
             openAccountViaService(customerId, new BigDecimal("5000"));
             openAccountViaService(customerId, new BigDecimal("3000"));
 
-            mockMvc.perform(withAuth(get(ACCOUNTS).param("customerId", customerId)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data", hasSize(2)));
-        }
+        mockMvc.perform(withAuth(get(ACCOUNTS).param("customerId", customerId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data", hasSize(2)));
+    }
 
-        @Test
+    @Test
         @DisplayName("Unknown customer returns empty list, not 404")
         void unknownCustomer_returnsEmptyList() throws Exception {
-            mockMvc.perform(withAuth(get(ACCOUNTS).param("customerId", "CUST-NONE")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data", hasSize(0)));
+        mockMvc.perform(withAuth(get(ACCOUNTS).param("customerId", "CUST-NONE")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data", hasSize(0)));
         }
     }
 
@@ -384,7 +368,7 @@ class HttpIntegrationTest {
     @DisplayName("POST /api/v1/payments — initiatePayment")
     class InitiatePaymentHttp {
 
-        @Test
+    @Test
         @DisplayName("Valid payment → 201 with PENDING_FRAUD_CHECK status")
         void validPayment_returns201() throws Exception {
             String aliceId    = onboardAndCompleteViaApi("pay.alice@example.com", "+447700800100", "HTTPL1234F");
@@ -392,22 +376,20 @@ class HttpIntegrationTest {
             String aliceAccId = openAccountViaService(aliceId, new BigDecimal("10000"));
             String bobAccId   = openAccountViaService(bobId,   new BigDecimal("500"));
 
-            InitiatePaymentRequest req = new InitiatePaymentRequest(
-                    aliceId, aliceAccId, bobAccId,
-                    new BigDecimal("1000"), "GBP", Payment.PaymentType.IMPS, "test");
+        InitiatePaymentRequest req = new InitiatePaymentRequest(
+                aliceId, aliceAccId, bobAccId,
+                new BigDecimal("1000"), "GBP", Payment.PaymentType.IMPS, "test");
+        mockMvc.perform(withAuth(post(PAYMENTS)
+                .contentType(MediaType.APPLICATION_JSON).content(toJson(req))))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.status").value("PENDING_FRAUD_CHECK"))
+            .andExpect(jsonPath("$.data.amount").value(1000))
+            .andExpect(jsonPath("$.data.referenceNumber").value(startsWith("IMPS-")))
+            .andExpect(jsonPath("$.message").value("Payment initiated"));
+    }
 
-            mockMvc.perform(withAuth(post(PAYMENTS)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(toJson(req))))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.status").value("PENDING_FRAUD_CHECK"))
-                .andExpect(jsonPath("$.data.amount").value(1000))
-                .andExpect(jsonPath("$.data.referenceNumber").value(startsWith("IMPS-")))
-                .andExpect(jsonPath("$.message").value("Payment initiated"));
-        }
-
-        @Test
+    @Test
         @DisplayName("Insufficient funds → 422 INSUFFICIENT_FUNDS")
         void insufficientFunds_returns422() throws Exception {
             String aliceId    = onboardAndCompleteViaApi("insuf.alice@example.com", "+447700800110", "HTTPN1234F");
@@ -415,24 +397,21 @@ class HttpIntegrationTest {
             String aliceAccId = openAccountViaService(aliceId, new BigDecimal("100"));  // tiny balance
             String bobAccId   = openAccountViaService(bobId,   new BigDecimal("500"));
 
-            InitiatePaymentRequest req = new InitiatePaymentRequest(
-                    aliceId, aliceAccId, bobAccId,
-                    new BigDecimal("5000"), "GBP", Payment.PaymentType.IMPS, "too much");
+        InitiatePaymentRequest req = new InitiatePaymentRequest(
+                aliceId, aliceAccId, bobAccId,
+                new BigDecimal("5000"), "GBP", Payment.PaymentType.IMPS, "too much");
+        mockMvc.perform(withAuth(post(PAYMENTS)
+                .contentType(MediaType.APPLICATION_JSON).content(toJson(req))))
+            .andExpect(status().isUnprocessableContent())
+            .andExpect(jsonPath("$.errorCode").value("INSUFFICIENT_FUNDS"));
+    }
 
-            mockMvc.perform(withAuth(post(PAYMENTS)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(toJson(req))))
-                .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.errorCode").value("INSUFFICIENT_FUNDS"));
-        }
-
-        @Test
+    @Test
         @DisplayName("Missing required fields → 400")
         void missingFields_returns400() throws Exception {
-            mockMvc.perform(withAuth(post(PAYMENTS)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"amount\":500}")))
-                .andExpect(status().isBadRequest());
+        mockMvc.perform(withAuth(post(PAYMENTS)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"amount\":500}")))
+            .andExpect(status().isBadRequest());
         }
     }
 
@@ -440,7 +419,7 @@ class HttpIntegrationTest {
     @DisplayName("POST /api/v1/payments/{id}/process")
     class ProcessPaymentHttp {
 
-        @Test
+    @Test
         @DisplayName("Valid payment processes to COMPLETED with correct balances")
         void processPayment_returns200() throws Exception {
             String aliceId    = onboardAndCompleteViaApi("proc.alice@example.com", "+447700800120", "HTTPP1234F");
@@ -449,27 +428,26 @@ class HttpIntegrationTest {
             String bobAccId   = openAccountViaService(bobId,   new BigDecimal("500"));
 
             // Initiate first
-            InitiatePaymentRequest req = new InitiatePaymentRequest(
-                    aliceId, aliceAccId, bobAccId,
-                    new BigDecimal("2000"), "GBP", Payment.PaymentType.NEFT, "process test");
-            String initBody = mockMvc.perform(withAuth(post(PAYMENTS)
-                    .contentType(MediaType.APPLICATION_JSON).content(toJson(req))))
-                .andReturn().getResponse().getContentAsString();
-
-            String paymentId = objectMapper.readTree(initBody).at("/data/paymentId").asText();
+        InitiatePaymentRequest req = new InitiatePaymentRequest(
+                aliceId, aliceAccId, bobAccId,
+                new BigDecimal("2000"), "GBP", Payment.PaymentType.NEFT, "process test");
+        String initBody = mockMvc.perform(withAuth(post(PAYMENTS)
+                .contentType(MediaType.APPLICATION_JSON).content(toJson(req))))
+            .andReturn().getResponse().getContentAsString();
+        String paymentId = objectMapper.readTree(initBody).at("/data/paymentId").asText();
 
             // Now process
-            mockMvc.perform(withAuth(post(PAYMENTS + "/" + paymentId + "/process")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("COMPLETED"))
-                .andExpect(jsonPath("$.data.completedAt").isNotEmpty());
-        }
+        mockMvc.perform(withAuth(post(PAYMENTS + "/" + paymentId + "/process")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+            .andExpect(jsonPath("$.data.completedAt").isNotEmpty());
+    }
 
-        @Test
+    @Test
         @DisplayName("Unknown payment → 404")
         void unknownPayment_returns404() throws Exception {
-            mockMvc.perform(withAuth(post(PAYMENTS + "/PAY-GHOST-999/process")))
-                .andExpect(status().isNotFound());
+        mockMvc.perform(withAuth(post(PAYMENTS + "/PAY-GHOST-999/process")))
+            .andExpect(status().isNotFound());
         }
     }
 
@@ -477,12 +455,12 @@ class HttpIntegrationTest {
     @DisplayName("GET /api/v1/payments/{id}")
     class GetPaymentHttp {
 
-        @Test
+    @Test
         @DisplayName("Unknown payment → 404")
         void unknownPayment_returns404() throws Exception {
-            mockMvc.perform(withAuth(get(PAYMENTS + "/PAY-NONEXISTENT")))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+        mockMvc.perform(withAuth(get(PAYMENTS + "/PAY-NONEXISTENT")))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
         }
     }
 
@@ -490,18 +468,18 @@ class HttpIntegrationTest {
     @DisplayName("GET /api/v1/payments/accounts/{id}/daily-summary")
     class DailySummaryHttp {
 
-        @Test
+    @Test
         @DisplayName("Account with no transactions returns zeros")
         void noTransactions_returnsZeroes() throws Exception {
             String customerId = onboardAndCompleteViaApi(
                     "daily.http@example.com", "+447700800130", "HTTPR1234F");
             String accountId  = openAccountViaService(customerId, new BigDecimal("5000"));
 
-            mockMvc.perform(withAuth(get(PAYMENTS + "/accounts/" + accountId + "/daily-summary")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.totalSpentToday").value(0))
-                .andExpect(jsonPath("$.data.transactionCount").value(0))
-                .andExpect(jsonPath("$.data.accountId").value(accountId));
+        mockMvc.perform(withAuth(get(PAYMENTS + "/accounts/" + accountId + "/daily-summary")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.totalSpentToday").value(0))
+            .andExpect(jsonPath("$.data.transactionCount").value(0))
+            .andExpect(jsonPath("$.data.accountId").value(accountId));
         }
     }
 
@@ -509,17 +487,17 @@ class HttpIntegrationTest {
     @DisplayName("GET /api/v1/payments?accountId=...")
     class GetPaymentsHttp {
 
-        @Test
+    @Test
         @DisplayName("Returns paged list of payments for account")
         void returnsPagedPayments() throws Exception {
             String customerId = onboardAndCompleteViaApi(
                     "paged.http@example.com", "+447700800140", "HTTPS1234F");
             String accountId  = openAccountViaService(customerId, new BigDecimal("10000"));
 
-            mockMvc.perform(withAuth(get(PAYMENTS).param("accountId", accountId)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.totalElements").value(0))
-                .andExpect(jsonPath("$.data.content").isArray());
+        mockMvc.perform(withAuth(get(PAYMENTS).param("accountId", accountId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.totalElements").value(0))
+            .andExpect(jsonPath("$.data.content").isArray());
         }
     }
 
@@ -527,7 +505,7 @@ class HttpIntegrationTest {
     @DisplayName("POST /api/v1/accounts/{id}/block and /unblock")
     class BlockUnblockHttp {
 
-        @Test
+    @Test
         @DisplayName("Block then unblock account via HTTP")
         void blockAndUnblock_via_http() throws Exception {
             String customerId = onboardAndCompleteViaApi(
@@ -535,17 +513,16 @@ class HttpIntegrationTest {
             String accountId  = openAccountViaService(customerId, new BigDecimal("5000"));
 
             // Block
-            mockMvc.perform(withAuth(post(ACCOUNTS + "/" + accountId + "/block")
-                    .param("reason", "Fraud detected")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("BLOCKED"))
-                .andExpect(jsonPath("$.message").value("Account blocked"));
+        mockMvc.perform(withAuth(post(ACCOUNTS + "/" + accountId + "/block").param("reason", "Fraud detected")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("BLOCKED"))
+            .andExpect(jsonPath("$.message").value("Account blocked"));
 
             // Unblock
-            mockMvc.perform(withAuth(post(ACCOUNTS + "/" + accountId + "/unblock")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
-                .andExpect(jsonPath("$.message").value("Account unblocked"));
+        mockMvc.perform(withAuth(post(ACCOUNTS + "/" + accountId + "/unblock")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+            .andExpect(jsonPath("$.message").value("Account unblocked"));
         }
     }
 
@@ -553,20 +530,19 @@ class HttpIntegrationTest {
     @DisplayName("GET /api/v1/onboarding/kyc/pending")
     class PendingKycHttp {
 
-        @Test
+    @Test
         @DisplayName("Returns paginated pending KYC customers")
         void returnsKycPendingCustomers() throws Exception {
-            OnboardingResponse ob = onboardingService.initiateOnboarding(
-                    validOnboardingRequest("kyc.pend.http@example.com", "+447700800160", "HTTPU1234F"));
-            onboardingService.updateKycStatus(
-                    new KycUpdateRequest(ob.customerId(), Customer.KycStatus.UNDER_REVIEW, null));
-
-            mockMvc.perform(withAuth(get(ONBOARDING + "/kyc/pending")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.content", hasSize(greaterThanOrEqualTo(1))))
-                .andExpect(jsonPath("$.data.totalElements", greaterThanOrEqualTo(1)));
-        }
+        OnboardingResponse ob = onboardingService.initiateOnboarding(
+                validOnboardingRequest("kyc.pend.http@example.com", "+447700800160", "HTTPU1234F"));
+        onboardingService.updateKycStatus(
+                new KycUpdateRequest(ob.customerId(), Customer.KycStatus.UNDER_REVIEW, null));
+        mockMvc.perform(withAuth(get(ONBOARDING + "/kyc/pending")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.content", hasSize(greaterThanOrEqualTo(1))))
+            .andExpect(jsonPath("$.data.totalElements", greaterThanOrEqualTo(1)));
     }
+}
 
     // ────────────────────────────────────────────────────────────────────────
     // Helpers

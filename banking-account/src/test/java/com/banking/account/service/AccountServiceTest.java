@@ -32,10 +32,10 @@ import static org.mockito.Mockito.*;
 @DisplayName("AccountService")
 class AccountServiceTest {
 
-    @Mock AccountRepository          accountRepository;
-    @Mock AccountMapper              accountMapper;
-    @Mock CustomerOnboardingService  onboardingService;
-    @Mock NotificationService        notificationService;
+    @Mock AccountRepository         accountRepository;
+    @Mock AccountMapper             accountMapper;
+    @Mock CustomerOnboardingService onboardingService;
+    @Mock NotificationService       notificationService;
 
     @InjectMocks AccountService accountService;
 
@@ -86,101 +86,99 @@ class AccountServiceTest {
     @Nested @DisplayName("openAccount")
     class OpenAccount {
 
-        @Test
+    @Test
         void verifiedCustomer_savesAndNotifies() {
-            when(onboardingService.getCustomerEntity("CUST-001")).thenReturn(verifiedCustomer);
-            ArgumentCaptor<Account> cap = ArgumentCaptor.forClass(Account.class);
-            when(accountRepository.save(cap.capture())).thenAnswer(i -> i.getArgument(0));
-            when(accountMapper.toResponse(any())).thenReturn(dummyResponse());
+        when(onboardingService.getCustomerEntity("CUST-001")).thenReturn(verifiedCustomer);
+        ArgumentCaptor<Account> cap = ArgumentCaptor.forClass(Account.class);
+        when(accountRepository.save(cap.capture())).thenAnswer(i -> i.getArgument(0));
+        when(accountMapper.toResponse(any())).thenReturn(dummyResponse());
 
-            accountService.openAccount(new OpenAccountRequest(
+        accountService.openAccount(new OpenAccountRequest(
                 "CUST-001", Account.AccountType.SAVINGS, "GBP",
                 "My Savings", new BigDecimal("5000"), null, null));
 
-            assertThat(cap.getValue().getStatus()).isEqualTo(Account.AccountStatus.ACTIVE);
-            assertThat(cap.getValue().getBalance()).isEqualByComparingTo("5000");
-            assertThat(cap.getValue().getAccountId()).matches("ACC-\\d{6}-\\d{6}-\\d");
-            verify(notificationService).sendAccountOpenedNotification(anyString(), anyString(), anyString(), anyString());
-        }
+        assertThat(cap.getValue().getStatus()).isEqualTo(Account.AccountStatus.ACTIVE);
+        assertThat(cap.getValue().getBalance()).isEqualByComparingTo("5000");
+        assertThat(cap.getValue().getAccountId()).matches("ACC-\\d{6}-\\d{6}-\\d");
+        verify(notificationService).sendAccountOpenedNotification(anyString(), anyString(), anyString(), anyString());
+    }
 
-        @Test
+    @Test
         void kycNotVerified_throwsOnboardingException() {
-            verifiedCustomer.setKycStatus(Customer.KycStatus.PENDING);
-            when(onboardingService.getCustomerEntity("CUST-001")).thenReturn(verifiedCustomer);
+        verifiedCustomer.setKycStatus(Customer.KycStatus.PENDING);
+        when(onboardingService.getCustomerEntity("CUST-001")).thenReturn(verifiedCustomer);
 
-            assertThatThrownBy(() -> accountService.openAccount(
+        assertThatThrownBy(() -> accountService.openAccount(
                 new OpenAccountRequest("CUST-001", Account.AccountType.SAVINGS, "GBP", null, null, null, null)))
-                    .isInstanceOf(OnboardingException.class)
-                    .hasMessageContaining("KYC is not verified");
-            verify(accountRepository, never()).save(any());
-        }
+                .isInstanceOf(OnboardingException.class)
+                .hasMessageContaining("KYC is not verified");
+        verify(accountRepository, never()).save(any());
+    }
 
-        @Test
+    @Test
         void onboardingNotComplete_throwsOnboardingException() {
-            verifiedCustomer.setOnboardingStatus(Customer.OnboardingStatus.KYC_VERIFIED);
-            when(onboardingService.getCustomerEntity("CUST-001")).thenReturn(verifiedCustomer);
+        verifiedCustomer.setOnboardingStatus(Customer.OnboardingStatus.KYC_VERIFIED);
+        when(onboardingService.getCustomerEntity("CUST-001")).thenReturn(verifiedCustomer);
 
-            assertThatThrownBy(() -> accountService.openAccount(
+        assertThatThrownBy(() -> accountService.openAccount(
                 new OpenAccountRequest("CUST-001", Account.AccountType.SAVINGS, "GBP", null, null, null, null)))
-                    .isInstanceOf(OnboardingException.class)
-                    .hasMessageContaining("onboarding is not complete");
-        }
+                .isInstanceOf(OnboardingException.class)
+                .hasMessageContaining("onboarding is not complete");
+    }
 
-        @Test
+    @Test
         void nullInitialDeposit_defaultsToZero() {
-            when(onboardingService.getCustomerEntity("CUST-001")).thenReturn(verifiedCustomer);
-            ArgumentCaptor<Account> cap = ArgumentCaptor.forClass(Account.class);
-            when(accountRepository.save(cap.capture())).thenAnswer(i -> i.getArgument(0));
-            when(accountMapper.toResponse(any())).thenReturn(dummyResponse());
+        when(onboardingService.getCustomerEntity("CUST-001")).thenReturn(verifiedCustomer);
+        ArgumentCaptor<Account> cap = ArgumentCaptor.forClass(Account.class);
+        when(accountRepository.save(cap.capture())).thenAnswer(i -> i.getArgument(0));
+        when(accountMapper.toResponse(any())).thenReturn(dummyResponse());
 
-            accountService.openAccount(new OpenAccountRequest(
+        accountService.openAccount(new OpenAccountRequest(
                 "CUST-001", Account.AccountType.CURRENT, "GBP", null, null, null, null));
 
-            assertThat(cap.getValue().getBalance()).isEqualByComparingTo("0.00");
-        }
+        assertThat(cap.getValue().getBalance()).isEqualByComparingTo("0.00");
+    }
 
-        @Test
+    @Test
         void savingsAccount_getsCorrectDefaultsAndInterestRate() {
-            when(onboardingService.getCustomerEntity("CUST-001")).thenReturn(verifiedCustomer);
-            ArgumentCaptor<Account> cap = ArgumentCaptor.forClass(Account.class);
-            when(accountRepository.save(cap.capture())).thenAnswer(i -> i.getArgument(0));
-            when(accountMapper.toResponse(any())).thenReturn(dummyResponse());
+        when(onboardingService.getCustomerEntity("CUST-001")).thenReturn(verifiedCustomer);
+        ArgumentCaptor<Account> cap = ArgumentCaptor.forClass(Account.class);
+        when(accountRepository.save(cap.capture())).thenAnswer(i -> i.getArgument(0));
+        when(accountMapper.toResponse(any())).thenReturn(dummyResponse());
 
-            accountService.openAccount(new OpenAccountRequest(
+        accountService.openAccount(new OpenAccountRequest(
                 "CUST-001", Account.AccountType.SAVINGS, "GBP", null, BigDecimal.ZERO, null, null));
 
-            Account saved = cap.getValue();
-            assertThat(saved.getInterestRate()).isEqualByComparingTo("0.0350");
-            assertThat(saved.getMinimumBalance()).isEqualByComparingTo("100");
-            assertThat(saved.getDailyDebitLimit()).isEqualByComparingTo("10000");
-        }
+        assertThat(cap.getValue().getInterestRate()).isEqualByComparingTo("0.0350");
+        assertThat(cap.getValue().getMinimumBalance()).isEqualByComparingTo("100");
+        assertThat(cap.getValue().getDailyDebitLimit()).isEqualByComparingTo("10000");
+    }
 
-        @Test
+    @Test
         void currentAccount_getsHigherLimitsAndZeroInterest() {
-            when(onboardingService.getCustomerEntity("CUST-001")).thenReturn(verifiedCustomer);
-            ArgumentCaptor<Account> cap = ArgumentCaptor.forClass(Account.class);
-            when(accountRepository.save(cap.capture())).thenAnswer(i -> i.getArgument(0));
-            when(accountMapper.toResponse(any())).thenReturn(dummyResponse());
+        when(onboardingService.getCustomerEntity("CUST-001")).thenReturn(verifiedCustomer);
+        ArgumentCaptor<Account> cap = ArgumentCaptor.forClass(Account.class);
+        when(accountRepository.save(cap.capture())).thenAnswer(i -> i.getArgument(0));
+        when(accountMapper.toResponse(any())).thenReturn(dummyResponse());
 
-            accountService.openAccount(new OpenAccountRequest(
+        accountService.openAccount(new OpenAccountRequest(
                 "CUST-001", Account.AccountType.CURRENT, "GBP", null, BigDecimal.ZERO, null, null));
 
-            Account saved = cap.getValue();
-            assertThat(saved.getInterestRate()).isEqualByComparingTo("0.0000");
-            assertThat(saved.getDailyDebitLimit()).isEqualByComparingTo("100000");
-        }
+        assertThat(cap.getValue().getInterestRate()).isEqualByComparingTo("0.0000");
+        assertThat(cap.getValue().getDailyDebitLimit()).isEqualByComparingTo("100000");
+    }
 
-        @Test
+    @Test
         void customDisplayName_isSaved() {
-            when(onboardingService.getCustomerEntity("CUST-001")).thenReturn(verifiedCustomer);
-            ArgumentCaptor<Account> cap = ArgumentCaptor.forClass(Account.class);
-            when(accountRepository.save(cap.capture())).thenAnswer(i -> i.getArgument(0));
-            when(accountMapper.toResponse(any())).thenReturn(dummyResponse());
+        when(onboardingService.getCustomerEntity("CUST-001")).thenReturn(verifiedCustomer);
+        ArgumentCaptor<Account> cap = ArgumentCaptor.forClass(Account.class);
+        when(accountRepository.save(cap.capture())).thenAnswer(i -> i.getArgument(0));
+        when(accountMapper.toResponse(any())).thenReturn(dummyResponse());
 
-            accountService.openAccount(new OpenAccountRequest(
+        accountService.openAccount(new OpenAccountRequest(
                 "CUST-001", Account.AccountType.SAVINGS, "GBP", "Holiday Fund", BigDecimal.ZERO, null, null));
 
-            assertThat(cap.getValue().getDisplayName()).isEqualTo("Holiday Fund");
+        assertThat(cap.getValue().getDisplayName()).isEqualTo("Holiday Fund");
         }
     }
 
@@ -189,40 +187,40 @@ class AccountServiceTest {
     @Nested @DisplayName("debitAccount / creditAccount")
     class DebitCredit {
 
-        @Test
+    @Test
         void debit_savesUpdatedAccount() {
-            when(accountRepository.findById("ACC-001")).thenReturn(Optional.of(activeAccount));
-            when(accountRepository.save(any())).thenReturn(activeAccount);
+        when(accountRepository.findById("ACC-001")).thenReturn(Optional.of(activeAccount));
+        when(accountRepository.save(any())).thenReturn(activeAccount);
 
-            accountService.debitAccount("ACC-001", new BigDecimal("3000.00"));
+        accountService.debitAccount("ACC-001", new BigDecimal("3000.00"));
 
-            assertThat(activeAccount.getBalance()).isEqualByComparingTo("7000.00");
-            verify(accountRepository).save(activeAccount);
-        }
+        assertThat(activeAccount.getBalance()).isEqualByComparingTo("7000.00");
+        verify(accountRepository).save(activeAccount);
+    }
 
-        @Test
+    @Test
         void debit_accountNotFound_throwsNotFoundException() {
-            when(accountRepository.findById("GHOST")).thenReturn(Optional.empty());
-            assertThatThrownBy(() -> accountService.debitAccount("GHOST", BigDecimal.TEN))
-                    .isInstanceOf(AccountNotFoundException.class);
-        }
+        when(accountRepository.findById("GHOST")).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> accountService.debitAccount("GHOST", BigDecimal.TEN))
+                .isInstanceOf(AccountNotFoundException.class);
+    }
 
-        @Test
+    @Test
         void debit_blockedAccount_throwsAccountInactive() {
-            activeAccount.setStatus(Account.AccountStatus.BLOCKED);
-            when(accountRepository.findById("ACC-001")).thenReturn(Optional.of(activeAccount));
-            assertThatThrownBy(() -> accountService.debitAccount("ACC-001", BigDecimal.TEN))
-                    .isInstanceOf(AccountInactiveException.class);
-        }
+        activeAccount.setStatus(Account.AccountStatus.BLOCKED);
+        when(accountRepository.findById("ACC-001")).thenReturn(Optional.of(activeAccount));
+        assertThatThrownBy(() -> accountService.debitAccount("ACC-001", BigDecimal.TEN))
+                .isInstanceOf(AccountInactiveException.class);
+    }
 
-        @Test
+    @Test
         void credit_savesUpdatedAccount() {
-            when(accountRepository.findById("ACC-001")).thenReturn(Optional.of(activeAccount));
-            when(accountRepository.save(any())).thenReturn(activeAccount);
+        when(accountRepository.findById("ACC-001")).thenReturn(Optional.of(activeAccount));
+        when(accountRepository.save(any())).thenReturn(activeAccount);
 
-            accountService.creditAccount("ACC-001", new BigDecimal("500.00"));
+        accountService.creditAccount("ACC-001", new BigDecimal("500.00"));
 
-            assertThat(activeAccount.getBalance()).isEqualByComparingTo("10500.00");
+        assertThat(activeAccount.getBalance()).isEqualByComparingTo("10500.00");
         }
     }
 
@@ -231,27 +229,27 @@ class AccountServiceTest {
     @Nested @DisplayName("placeHold / releaseHold")
     class Holds {
 
-        @Test
+    @Test
         void placeHold_reducesAvailableBalance() {
-            when(accountRepository.findById("ACC-001")).thenReturn(Optional.of(activeAccount));
-            when(accountRepository.save(any())).thenReturn(activeAccount);
+        when(accountRepository.findById("ACC-001")).thenReturn(Optional.of(activeAccount));
+        when(accountRepository.save(any())).thenReturn(activeAccount);
 
-            accountService.placeHold("ACC-001", new BigDecimal("2000.00"));
+        accountService.placeHold("ACC-001", new BigDecimal("2000.00"));
 
-            assertThat(activeAccount.getAvailableBalance()).isEqualByComparingTo("8000.00");
-            assertThat(activeAccount.getBalance()).isEqualByComparingTo("10000.00"); // unchanged
-        }
+        assertThat(activeAccount.getAvailableBalance()).isEqualByComparingTo("8000.00");
+        assertThat(activeAccount.getBalance()).isEqualByComparingTo("10000.00");
+    }
 
-        @Test
-        void releaseHold_restoresAvailableBalance() {
-            activeAccount.setHoldAmount(new BigDecimal("2000.00"));
-            activeAccount.setAvailableBalance(new BigDecimal("8000.00"));
-            when(accountRepository.findById("ACC-001")).thenReturn(Optional.of(activeAccount));
-            when(accountRepository.save(any())).thenReturn(activeAccount);
+    @Test
+    void releaseHold_restoresAvailableBalance() {
+        activeAccount.setHoldAmount(new BigDecimal("2000.00"));
+        activeAccount.setAvailableBalance(new BigDecimal("8000.00"));
+        when(accountRepository.findById("ACC-001")).thenReturn(Optional.of(activeAccount));
+        when(accountRepository.save(any())).thenReturn(activeAccount);
 
-            accountService.releaseHold("ACC-001", new BigDecimal("2000.00"));
+        accountService.releaseHold("ACC-001", new BigDecimal("2000.00"));
 
-            assertThat(activeAccount.getAvailableBalance()).isEqualByComparingTo("10000.00");
+        assertThat(activeAccount.getAvailableBalance()).isEqualByComparingTo("10000.00");
         }
     }
 
@@ -289,33 +287,39 @@ class AccountServiceTest {
     @Nested @DisplayName("validateAccountActive / hasSufficientFunds")
     class Queries {
 
-        @Test void activeAccount_returnsTrue() {
+        @Test
+        void activeAccount_returnsTrue() {
             when(accountRepository.findById("ACC-001")).thenReturn(Optional.of(activeAccount));
             assertThat(accountService.validateAccountActive("ACC-001")).isTrue();
         }
 
-        @Test void blockedAccount_returnsFalse() {
+        @Test
+        void blockedAccount_returnsFalse() {
             activeAccount.setStatus(Account.AccountStatus.BLOCKED);
             when(accountRepository.findById("ACC-001")).thenReturn(Optional.of(activeAccount));
             assertThat(accountService.validateAccountActive("ACC-001")).isFalse();
         }
 
-        @Test void missingAccount_returnsFalse() {
+        @Test
+        void missingAccount_returnsFalse() {
             when(accountRepository.findById("GHOST")).thenReturn(Optional.empty());
             assertThat(accountService.validateAccountActive("GHOST")).isFalse();
         }
 
-        @Test void hasSufficientFunds_true_whenEnoughAvailable() {
+        @Test
+        void hasSufficientFunds_true_whenEnoughAvailable() {
             when(accountRepository.findById("ACC-001")).thenReturn(Optional.of(activeAccount));
             assertThat(accountService.hasSufficientFunds("ACC-001", new BigDecimal("5000"))).isTrue();
         }
 
-        @Test void hasSufficientFunds_false_whenInsufficient() {
+        @Test
+        void hasSufficientFunds_false_whenInsufficient() {
             when(accountRepository.findById("ACC-001")).thenReturn(Optional.of(activeAccount));
             assertThat(accountService.hasSufficientFunds("ACC-001", new BigDecimal("50000"))).isFalse();
         }
 
-        @Test void getCustomerAccounts_returnsAll() {
+        @Test
+        void getCustomerAccounts_returnsAll() {
             AccountSummary summary = new AccountSummary("ACC-001", "GB001", "SAVINGS", "ACTIVE",
                     new BigDecimal("10000"), "GBP");
             when(accountRepository.findByCustomerIdOrderByCreatedAtDesc("CUST-001"))
@@ -323,21 +327,23 @@ class AccountServiceTest {
             when(accountMapper.toSummary(activeAccount)).thenReturn(summary);
 
             List<AccountSummary> result = accountService.getCustomerAccounts("CUST-001");
+
             assertThat(result).hasSize(1);
             assertThat(result.get(0).accountId()).isEqualTo("ACC-001");
         }
 
-        @Test void getCustomerAccounts_noAccounts_returnsEmptyList() {
+        @Test
+        void getCustomerAccounts_noAccounts_returnsEmptyList() {
             when(accountRepository.findByCustomerIdOrderByCreatedAtDesc("CUST-NONE"))
                     .thenReturn(List.of());
             assertThat(accountService.getCustomerAccounts("CUST-NONE")).isEmpty();
         }
 
-        @Test void getBalance_returnsBalanceResponse() {
+        @Test
+        void getBalance_returnsBalanceResponse() {
             when(accountRepository.findById("ACC-001")).thenReturn(Optional.of(activeAccount));
             when(accountMapper.toBalanceResponse(activeAccount)).thenReturn(dummyBalance());
-            BalanceResponse bal = accountService.getBalance("ACC-001");
-            assertThat(bal.accountId()).isEqualTo("ACC-001");
+            assertThat(accountService.getBalance("ACC-001").accountId()).isEqualTo("ACC-001");
         }
     }
 }

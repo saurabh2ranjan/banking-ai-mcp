@@ -8,7 +8,6 @@ import com.banking.onboarding.dto.CustomerDtos.*;
 import com.banking.onboarding.mapper.CustomerMapper;
 import com.banking.onboarding.repository.CustomerRepository;
 import com.banking.onboarding.validator.KycValidator;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -34,10 +33,10 @@ import static org.mockito.Mockito.*;
 @DisplayName("CustomerOnboardingService")
 class CustomerOnboardingServiceTest {
 
-    @Mock CustomerRepository     customerRepository;
-    @Mock CustomerMapper         customerMapper;
-    @Mock KycValidator           kycValidator;
-    @Mock NotificationService    notificationService;
+    @Mock CustomerRepository  customerRepository;
+    @Mock CustomerMapper      customerMapper;
+    @Mock KycValidator        kycValidator;
+    @Mock NotificationService notificationService;
 
     @InjectMocks CustomerOnboardingService service;
 
@@ -64,8 +63,7 @@ class CustomerOnboardingServiceTest {
             Customer.IdDocumentType.PAN_CARD, LocalDate.of(2030, 12, 31),
             new AddressRequest("123 St", null, "London", "England", "EC1", "GBR"),
             Customer.EmploymentType.SALARIED, "Tech Corp",
-            new BigDecimal("80000"), "GBP", "SAVINGS"
-        );
+            new BigDecimal("80000"), "GBP", "SAVINGS");
     }
 
     private CustomerResponse dummyResponse(Customer c) {
@@ -76,8 +74,7 @@ class CustomerOnboardingServiceTest {
             "British", "ABCDE1234F", "PAN_CARD", LocalDate.of(2030, 12, 31),
             c.getKycStatus().name(), c.getOnboardingStatus().name(), "LOW",
             null, "SALARIED", "Tech Corp", new BigDecimal("80000"), "GBP",
-            LocalDateTime.now(), LocalDateTime.now()
-        );
+            LocalDateTime.now(), LocalDateTime.now());
     }
 
     private CustomerSummary dummySummary(Customer c) {
@@ -85,8 +82,7 @@ class CustomerOnboardingServiceTest {
             c.getCustomerId(), "Alice Johnson",
             "alice@example.com", "+447700900001",
             c.getKycStatus().name(), c.getOnboardingStatus().name(),
-            LocalDateTime.now()
-        );
+            LocalDateTime.now());
     }
 
     // ─── initiateOnboarding ───────────────────────────────────────────────────
@@ -94,55 +90,69 @@ class CustomerOnboardingServiceTest {
     @Nested @DisplayName("initiateOnboarding")
     class InitiateOnboarding {
 
-        @Test
+    @Test
         void success_generatesId_savesAndNotifies() {
-            Customer entity = buildCustomer(null, Customer.KycStatus.PENDING, Customer.OnboardingStatus.INITIATED);
-            when(customerRepository.existsByEmail(anyString())).thenReturn(false);
-            when(customerRepository.existsByMobile(anyString())).thenReturn(false);
-            when(customerRepository.existsByPanNumber(anyString())).thenReturn(false);
-            when(customerMapper.toEntity(any())).thenReturn(entity);
+        Customer entity = buildCustomer(null, Customer.KycStatus.PENDING, Customer.OnboardingStatus.INITIATED);
+        when(customerRepository.existsByEmail(anyString())).thenReturn(false);
+        when(customerRepository.existsByMobile(anyString())).thenReturn(false);
+        when(customerRepository.existsByPanNumber(anyString())).thenReturn(false);
+        when(customerMapper.toEntity(any())).thenReturn(entity);
+        ArgumentCaptor<Customer> saved = ArgumentCaptor.forClass(Customer.class);
+        when(customerRepository.save(saved.capture())).thenReturn(entity);
 
-            ArgumentCaptor<Customer> saved = ArgumentCaptor.forClass(Customer.class);
-            when(customerRepository.save(saved.capture())).thenReturn(entity);
+        OnboardingResponse resp = service.initiateOnboarding(validRequest());
 
-            OnboardingResponse resp = service.initiateOnboarding(validRequest());
+        assertThat(resp.status()).isEqualTo("INITIATED");
+        assertThat(resp.nextStep()).isEqualTo("SUBMIT_DOCUMENTS");
+        assertThat(saved.getValue().getCustomerId()).matches("CUST-\\d{8}");
+        verify(kycValidator).validate(any());
+        verify(notificationService).sendWelcomeEmail(eq("alice@example.com"), anyString());
+    }
 
-            assertThat(resp.status()).isEqualTo("INITIATED");
-            assertThat(resp.nextStep()).isEqualTo("SUBMIT_DOCUMENTS");
-            assertThat(saved.getValue().getCustomerId()).matches("CUST-\\d{8}");
-            verify(kycValidator).validate(any());
-            verify(notificationService).sendWelcomeEmail(eq("alice@example.com"), anyString());
-        }
+    @Test
+    void initiateOnboarding_kycValidationCalledBeforePersistence() {
+        when(customerRepository.existsByEmail(anyString())).thenReturn(false);
+        when(customerRepository.existsByMobile(anyString())).thenReturn(false);
+        Customer entity = buildCustomer(null, Customer.KycStatus.PENDING, Customer.OnboardingStatus.INITIATED);
+        when(customerMapper.toEntity(any())).thenReturn(entity);
+        when(customerRepository.save(any())).thenReturn(entity);
 
-        @Test
-        void duplicateEmail_throwsDuplicateResource() {
-            when(customerRepository.existsByEmail("alice@example.com")).thenReturn(true);
-            assertThatThrownBy(() -> service.initiateOnboarding(validRequest()))
-                    .isInstanceOf(DuplicateResourceException.class)
-                    .hasMessageContaining("email: alice@example.com");
-            verify(customerRepository, never()).save(any());
-        }
+        service.initiateOnboarding(validRequest());
 
-        @Test
+        var inOrder = inOrder(kycValidator, customerRepository);
+        inOrder.verify(kycValidator).validate(any());
+        inOrder.verify(customerRepository).save(any());
+    }
+
+    @Test
+    void initiateOnboarding_duplicateEmail_throwsDuplicateResourceException() {
+        when(customerRepository.existsByEmail("alice@example.com")).thenReturn(true);
+        assertThatThrownBy(() -> service.initiateOnboarding(validRequest()))
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessageContaining("email: alice@example.com");
+        verify(customerRepository, never()).save(any());
+    }
+
+    @Test
         void duplicateMobile_throwsDuplicateResource() {
-            when(customerRepository.existsByEmail(anyString())).thenReturn(false);
-            when(customerRepository.existsByMobile("+447700900001")).thenReturn(true);
-            assertThatThrownBy(() -> service.initiateOnboarding(validRequest()))
-                    .isInstanceOf(DuplicateResourceException.class)
-                    .hasMessageContaining("mobile");
-        }
+        when(customerRepository.existsByEmail(anyString())).thenReturn(false);
+        when(customerRepository.existsByMobile("+447700900001")).thenReturn(true);
+        assertThatThrownBy(() -> service.initiateOnboarding(validRequest()))
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessageContaining("mobile");
+    }
 
-        @Test
+    @Test
         void duplicatePan_throwsDuplicateResource() {
-            when(customerRepository.existsByEmail(anyString())).thenReturn(false);
-            when(customerRepository.existsByMobile(anyString())).thenReturn(false);
-            when(customerRepository.existsByPanNumber("ABCDE1234F")).thenReturn(true);
-            assertThatThrownBy(() -> service.initiateOnboarding(validRequest()))
-                    .isInstanceOf(DuplicateResourceException.class)
-                    .hasMessageContaining("PAN");
-        }
+        when(customerRepository.existsByEmail(anyString())).thenReturn(false);
+        when(customerRepository.existsByMobile(anyString())).thenReturn(false);
+        when(customerRepository.existsByPanNumber("ABCDE1234F")).thenReturn(true);
+        assertThatThrownBy(() -> service.initiateOnboarding(validRequest()))
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessageContaining("PAN");
+    }
 
-        @Test
+    @Test
         void kycValidation_isCalled_beforePersistence() {
             when(customerRepository.existsByEmail(anyString())).thenReturn(false);
             when(customerRepository.existsByMobile(anyString())).thenReturn(false);
@@ -159,23 +169,22 @@ class CustomerOnboardingServiceTest {
 
         @Test
         void nullPan_doesNotCheckPanDuplicate() {
-            var reqNoPan = new OnboardingRequest(
-                "Alice", "Johnson", LocalDate.of(1990, 5, 15),
-                Customer.Gender.FEMALE, "alice@example.com", "+447700900001", "British",
+        var reqNoPan = new OnboardingRequest(
+            "Alice", "Johnson", LocalDate.of(1990, 5, 15),
+            Customer.Gender.FEMALE, "alice@example.com", "+447700900001", "British",
                 null, "GB12345", null,                          // passport, no PAN
-                Customer.IdDocumentType.PASSPORT, LocalDate.of(2030, 12, 31),
-                new AddressRequest("123 St", null, "London", "England", "EC1", "GBR"),
-                null, null, null, null, null
-            );
-            when(customerRepository.existsByEmail(anyString())).thenReturn(false);
-            when(customerRepository.existsByMobile(anyString())).thenReturn(false);
-            Customer entity = buildCustomer(null, Customer.KycStatus.PENDING, Customer.OnboardingStatus.INITIATED);
-            when(customerMapper.toEntity(any())).thenReturn(entity);
-            when(customerRepository.save(any())).thenReturn(entity);
+            Customer.IdDocumentType.PASSPORT, LocalDate.of(2030, 12, 31),
+            new AddressRequest("123 St", null, "London", "England", "EC1", "GBR"),
+            null, null, null, null, null);
+        when(customerRepository.existsByEmail(anyString())).thenReturn(false);
+        when(customerRepository.existsByMobile(anyString())).thenReturn(false);
+        Customer entity = buildCustomer(null, Customer.KycStatus.PENDING, Customer.OnboardingStatus.INITIATED);
+        when(customerMapper.toEntity(any())).thenReturn(entity);
+        when(customerRepository.save(any())).thenReturn(entity);
 
-            service.initiateOnboarding(reqNoPan);
+        service.initiateOnboarding(reqNoPan);
 
-            verify(customerRepository, never()).existsByPanNumber(any());
+        verify(customerRepository, never()).existsByPanNumber(any());
         }
     }
 
@@ -184,57 +193,57 @@ class CustomerOnboardingServiceTest {
     @Nested @DisplayName("updateKycStatus")
     class UpdateKycStatus {
 
-        @Test
+    @Test
         void verifyKyc_setsTimestampAndOnboardingStatus() {
-            Customer c = buildCustomer("CUST-001", Customer.KycStatus.PENDING, Customer.OnboardingStatus.INITIATED);
-            when(customerRepository.findById("CUST-001")).thenReturn(Optional.of(c));
-            when(customerRepository.save(any())).thenReturn(c);
-            when(customerMapper.toResponse(any())).thenReturn(dummyResponse(c));
+        Customer c = buildCustomer("CUST-001", Customer.KycStatus.PENDING, Customer.OnboardingStatus.INITIATED);
+        when(customerRepository.findById("CUST-001")).thenReturn(Optional.of(c));
+        when(customerRepository.save(any())).thenReturn(c);
+        when(customerMapper.toResponse(any())).thenReturn(dummyResponse(c));
 
-            service.updateKycStatus(new KycUpdateRequest("CUST-001", Customer.KycStatus.VERIFIED, null));
+        service.updateKycStatus(new KycUpdateRequest("CUST-001", Customer.KycStatus.VERIFIED, null));
 
-            assertThat(c.getKycStatus()).isEqualTo(Customer.KycStatus.VERIFIED);
-            assertThat(c.getKycVerifiedAt()).isNotNull();
-            assertThat(c.getOnboardingStatus()).isEqualTo(Customer.OnboardingStatus.KYC_VERIFIED);
-            verify(kycValidator).screenForAml(c);
-            verify(notificationService).sendKycApprovedEmail(eq("alice@example.com"), anyString());
-        }
+        assertThat(c.getKycStatus()).isEqualTo(Customer.KycStatus.VERIFIED);
+        assertThat(c.getKycVerifiedAt()).isNotNull();
+        assertThat(c.getOnboardingStatus()).isEqualTo(Customer.OnboardingStatus.KYC_VERIFIED);
+        verify(kycValidator).screenForAml(c);
+        verify(notificationService).sendKycApprovedEmail(eq("alice@example.com"), anyString());
+    }
 
-        @Test
+    @Test
         void rejectKyc_setsRejectionReasonAndStatus() {
-            Customer c = buildCustomer("CUST-001", Customer.KycStatus.UNDER_REVIEW, Customer.OnboardingStatus.DOCUMENTS_SUBMITTED);
-            when(customerRepository.findById("CUST-001")).thenReturn(Optional.of(c));
-            when(customerRepository.save(any())).thenReturn(c);
-            when(customerMapper.toResponse(any())).thenReturn(dummyResponse(c));
+        Customer c = buildCustomer("CUST-001", Customer.KycStatus.UNDER_REVIEW, Customer.OnboardingStatus.DOCUMENTS_SUBMITTED);
+        when(customerRepository.findById("CUST-001")).thenReturn(Optional.of(c));
+        when(customerRepository.save(any())).thenReturn(c);
+        when(customerMapper.toResponse(any())).thenReturn(dummyResponse(c));
 
-            service.updateKycStatus(new KycUpdateRequest("CUST-001", Customer.KycStatus.REJECTED, "Document unclear"));
+        service.updateKycStatus(new KycUpdateRequest("CUST-001", Customer.KycStatus.REJECTED, "Document unclear"));
 
-            assertThat(c.getKycStatus()).isEqualTo(Customer.KycStatus.REJECTED);
-            assertThat(c.getKycRejectionReason()).isEqualTo("Document unclear");
-            assertThat(c.getOnboardingStatus()).isEqualTo(Customer.OnboardingStatus.REJECTED);
-            verify(notificationService).sendKycRejectedEmail(anyString(), anyString(), eq("Document unclear"));
-            verify(notificationService, never()).sendKycApprovedEmail(anyString(), anyString());
-        }
+        assertThat(c.getKycStatus()).isEqualTo(Customer.KycStatus.REJECTED);
+        assertThat(c.getKycRejectionReason()).isEqualTo("Document unclear");
+        assertThat(c.getOnboardingStatus()).isEqualTo(Customer.OnboardingStatus.REJECTED);
+        verify(notificationService).sendKycRejectedEmail(anyString(), anyString(), eq("Document unclear"));
+        verify(notificationService, never()).sendKycApprovedEmail(anyString(), anyString());
+    }
 
-        @Test
+    @Test
         void underReview_doesNotFireApproveOrRejectNotification() {
-            Customer c = buildCustomer("CUST-001", Customer.KycStatus.PENDING, Customer.OnboardingStatus.INITIATED);
-            when(customerRepository.findById("CUST-001")).thenReturn(Optional.of(c));
-            when(customerRepository.save(any())).thenReturn(c);
-            when(customerMapper.toResponse(any())).thenReturn(dummyResponse(c));
+        Customer c = buildCustomer("CUST-001", Customer.KycStatus.PENDING, Customer.OnboardingStatus.INITIATED);
+        when(customerRepository.findById("CUST-001")).thenReturn(Optional.of(c));
+        when(customerRepository.save(any())).thenReturn(c);
+        when(customerMapper.toResponse(any())).thenReturn(dummyResponse(c));
 
-            service.updateKycStatus(new KycUpdateRequest("CUST-001", Customer.KycStatus.UNDER_REVIEW, null));
+        service.updateKycStatus(new KycUpdateRequest("CUST-001", Customer.KycStatus.UNDER_REVIEW, null));
 
-            verify(notificationService, never()).sendKycApprovedEmail(anyString(), anyString());
-            verify(notificationService, never()).sendKycRejectedEmail(anyString(), anyString(), anyString());
-        }
+        verify(notificationService, never()).sendKycApprovedEmail(anyString(), anyString());
+        verify(notificationService, never()).sendKycRejectedEmail(anyString(), anyString(), anyString());
+    }
 
-        @Test
+    @Test
         void customerNotFound_throwsCustomerNotFoundException() {
-            when(customerRepository.findById("GHOST")).thenReturn(Optional.empty());
-            assertThatThrownBy(() ->
-                service.updateKycStatus(new KycUpdateRequest("GHOST", Customer.KycStatus.VERIFIED, null)))
-                    .isInstanceOf(CustomerNotFoundException.class);
+        when(customerRepository.findById("GHOST")).thenReturn(Optional.empty());
+        assertThatThrownBy(() ->
+            service.updateKycStatus(new KycUpdateRequest("GHOST", Customer.KycStatus.VERIFIED, null)))
+                .isInstanceOf(CustomerNotFoundException.class);
         }
     }
 
@@ -289,7 +298,7 @@ class CustomerOnboardingServiceTest {
         }
 
         @Test
-        void getCustomer_missing_throwsNotFoundException() {
+        void getCustomer_notFound_throwsCustomerNotFoundException() {
             when(customerRepository.findById("GHOST")).thenReturn(Optional.empty());
             assertThatThrownBy(() -> service.getCustomer("GHOST"))
                     .isInstanceOf(CustomerNotFoundException.class);
@@ -300,19 +309,19 @@ class CustomerOnboardingServiceTest {
             Customer c = buildCustomer("CUST-001", Customer.KycStatus.VERIFIED, Customer.OnboardingStatus.COMPLETED);
             when(customerRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(c));
             when(customerMapper.toResponse(c)).thenReturn(dummyResponse(c));
-            assertThat(service.getCustomerByEmail("alice@example.com").email())
-                    .isEqualTo("alice@example.com");
+            assertThat(service.getCustomerByEmail("alice@example.com").email()).isEqualTo("alice@example.com");
         }
 
         @Test
-        void getCustomerByEmail_missing_throwsNotFoundException() {
+        void getCustomerByEmail_notFound_throwsCustomerNotFoundException() {
             when(customerRepository.findByEmail("ghost@x.com")).thenReturn(Optional.empty());
             assertThatThrownBy(() -> service.getCustomerByEmail("ghost@x.com"))
                     .isInstanceOf(CustomerNotFoundException.class);
         }
     }
 
-    @Nested @DisplayName("getPendingKycCustomers")
+    @Nested
+    @DisplayName("getPendingKycCustomers")
     class PendingKyc {
 
         @Test
@@ -323,14 +332,14 @@ class CustomerOnboardingServiceTest {
             when(customerMapper.toSummary(c)).thenReturn(dummySummary(c));
 
             var result = service.getPendingKycCustomers(PageRequest.of(0, 10));
+
             assertThat(result.getTotalElements()).isEqualTo(1);
             assertThat(result.getContent().get(0).customerId()).isEqualTo("CUST-001");
         }
 
         @Test
         void emptyQueue_returnsEmptyPage() {
-            when(customerRepository.findPendingKycCustomers(any()))
-                    .thenReturn(new PageImpl<>(List.of()));
+            when(customerRepository.findPendingKycCustomers(any())).thenReturn(new PageImpl<>(List.of()));
             assertThat(service.getPendingKycCustomers(PageRequest.of(0, 10)).getTotalElements()).isZero();
         }
     }

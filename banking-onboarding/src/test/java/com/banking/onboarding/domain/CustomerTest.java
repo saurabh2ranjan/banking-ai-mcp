@@ -16,12 +16,9 @@ class CustomerTest {
     private Customer buildCustomer(Customer.KycStatus kyc, Customer.OnboardingStatus ob) {
         return Customer.builder()
                 .customerId("CUST-001")
-                .firstName("Alice")
-                .lastName("Johnson")
-                .email("alice@example.com")
-                .mobile("+447700900001")
-                .kycStatus(kyc)
-                .onboardingStatus(ob)
+                .firstName("Alice").lastName("Johnson")
+                .email("alice@example.com").mobile("+447700900001")
+                .kycStatus(kyc).onboardingStatus(ob)
                 .riskCategory(Customer.RiskCategory.LOW)
                 .build();
     }
@@ -32,16 +29,16 @@ class CustomerTest {
     @DisplayName("isKycVerified()")
     class IsKycVerified {
 
-        @Test
+    @Test
         void verifiedStatus_returnsTrue() {
-            assertThat(buildCustomer(Customer.KycStatus.VERIFIED, Customer.OnboardingStatus.KYC_VERIFIED)
-                    .isKycVerified()).isTrue();
-        }
+        assertThat(buildCustomer(Customer.KycStatus.VERIFIED, Customer.OnboardingStatus.KYC_VERIFIED)
+                .isKycVerified()).isTrue();
+    }
 
         @ParameterizedTest(name = "status={0} → not verified")
-        @EnumSource(value = Customer.KycStatus.class, names = {"PENDING", "UNDER_REVIEW", "REJECTED", "EXPIRED"})
+    @EnumSource(value = Customer.KycStatus.class, names = {"PENDING", "UNDER_REVIEW", "REJECTED", "EXPIRED"})
         void nonVerifiedStatuses_returnFalse(Customer.KycStatus status) {
-            assertThat(buildCustomer(status, Customer.OnboardingStatus.INITIATED).isKycVerified()).isFalse();
+        assertThat(buildCustomer(status, Customer.OnboardingStatus.INITIATED).isKycVerified()).isFalse();
         }
     }
 
@@ -51,24 +48,23 @@ class CustomerTest {
     @DisplayName("isOnboardingComplete()")
     class IsOnboardingComplete {
 
-        @Test
+    @Test
         void completedStatus_returnsTrue() {
-            assertThat(buildCustomer(Customer.KycStatus.VERIFIED, Customer.OnboardingStatus.COMPLETED)
-                    .isOnboardingComplete()).isTrue();
-        }
+        assertThat(buildCustomer(Customer.KycStatus.VERIFIED, Customer.OnboardingStatus.COMPLETED)
+                .isOnboardingComplete()).isTrue();
+    }
 
-        @Test
+    @Test
         void accountCreatedStatus_alsoReturnsTrue() {
-            assertThat(buildCustomer(Customer.KycStatus.VERIFIED, Customer.OnboardingStatus.ACCOUNT_CREATED)
-                    .isOnboardingComplete()).isTrue();
-        }
+        assertThat(buildCustomer(Customer.KycStatus.VERIFIED, Customer.OnboardingStatus.ACCOUNT_CREATED)
+                .isOnboardingComplete()).isTrue();
+    }
 
         @ParameterizedTest(name = "status={0} → not complete")
-        @EnumSource(value = Customer.OnboardingStatus.class,
-                    names = {"INITIATED", "DOCUMENTS_SUBMITTED", "KYC_PENDING",
-                             "KYC_VERIFIED", "REJECTED", "SUSPENDED"})
+    @EnumSource(value = Customer.OnboardingStatus.class,
+                names = {"INITIATED", "DOCUMENTS_SUBMITTED", "KYC_PENDING", "KYC_VERIFIED", "REJECTED", "SUSPENDED"})
         void nonCompleteStatuses_returnFalse(Customer.OnboardingStatus status) {
-            assertThat(buildCustomer(Customer.KycStatus.PENDING, status).isOnboardingComplete()).isFalse();
+        assertThat(buildCustomer(Customer.KycStatus.PENDING, status).isOnboardingComplete()).isFalse();
         }
     }
 
@@ -87,8 +83,7 @@ class CustomerTest {
     @DisplayName("Default risk category is LOW when not set explicitly")
     void defaultRiskCategory_isLow() {
         Customer c = Customer.builder()
-                .customerId("CUST-002")
-                .firstName("Bob").lastName("Smith")
+                .customerId("CUST-002").firstName("Bob").lastName("Smith")
                 .kycStatus(Customer.KycStatus.PENDING)
                 .onboardingStatus(Customer.OnboardingStatus.INITIATED)
                 .build();
@@ -100,25 +95,18 @@ class CustomerTest {
     @Test
     @DisplayName("All required Gender values are present")
     void genderEnumValues() {
-        assertThat(Customer.Gender.values())
-                .containsExactlyInAnyOrder(
-                        Customer.Gender.MALE,
-                        Customer.Gender.FEMALE,
-                        Customer.Gender.OTHER,
-                        Customer.Gender.PREFER_NOT_TO_SAY);
+        assertThat(Customer.Gender.values()).containsExactlyInAnyOrder(
+                Customer.Gender.MALE, Customer.Gender.FEMALE,
+                Customer.Gender.OTHER, Customer.Gender.PREFER_NOT_TO_SAY);
     }
 
     @Test
     @DisplayName("All required EmploymentType values are present")
     void employmentTypeEnumValues() {
-        assertThat(Customer.EmploymentType.values())
-                .containsExactlyInAnyOrder(
-                        Customer.EmploymentType.SALARIED,
-                        Customer.EmploymentType.SELF_EMPLOYED,
-                        Customer.EmploymentType.BUSINESS_OWNER,
-                        Customer.EmploymentType.RETIRED,
-                        Customer.EmploymentType.STUDENT,
-                        Customer.EmploymentType.UNEMPLOYED);
+        assertThat(Customer.EmploymentType.values()).containsExactlyInAnyOrder(
+                Customer.EmploymentType.SALARIED, Customer.EmploymentType.SELF_EMPLOYED,
+                Customer.EmploymentType.BUSINESS_OWNER, Customer.EmploymentType.RETIRED,
+                Customer.EmploymentType.STUDENT, Customer.EmploymentType.UNEMPLOYED);
     }
 
     // ─── Mutable KYC fields ───────────────────────────────────────────────────

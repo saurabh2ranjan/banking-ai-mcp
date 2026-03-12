@@ -45,11 +45,11 @@ class BankingEndToEndIntegrationTest {
     // ─── Fixture helpers ──────────────────────────────────────────────────────
 
     private OnboardingRequest buildOnboardingRequest(String email, String mobile,
-                                                      String pan, String passport) {
+                                                      String pan) {
         return new OnboardingRequest(
             "Alice", "Johnson", LocalDate.of(1990, 5, 15),
             Customer.Gender.FEMALE, email, mobile, "British",
-            pan, passport, null,
+            pan, null, null,
             pan != null ? Customer.IdDocumentType.PAN_CARD : Customer.IdDocumentType.PASSPORT,
             LocalDate.of(2032, 12, 31),
             new AddressRequest("123 High Street", null, "London", "England", "EC1A 1BB", "GBR"),
@@ -60,7 +60,7 @@ class BankingEndToEndIntegrationTest {
 
     private String onboardAndComplete(String email, String mobile, String pan) {
         OnboardingResponse resp = onboardingService.initiateOnboarding(
-                buildOnboardingRequest(email, mobile, pan, null));
+                buildOnboardingRequest(email, mobile, pan));
         String id = resp.customerId();
         onboardingService.updateKycStatus(new KycUpdateRequest(id, Customer.KycStatus.VERIFIED, null));
         onboardingService.completeOnboarding(id);
@@ -91,7 +91,7 @@ class BankingEndToEndIntegrationTest {
     @DisplayName("Full onboarding: INITIATED → KYC VERIFIED → COMPLETED → account opened")
     void fullOnboardingWorkflow() {
         OnboardingResponse ob = onboardingService.initiateOnboarding(
-                buildOnboardingRequest("alice.e2e@example.com", "+447700900111", "ABCDE1234F", null));
+                buildOnboardingRequest("alice.e2e@example.com", "+447700900111", "ABCDE1234F"));
 
         assertThat(ob.customerId()).startsWith("CUST-");
         assertThat(ob.status()).isEqualTo("INITIATED");
@@ -128,7 +128,7 @@ class BankingEndToEndIntegrationTest {
     @DisplayName("Rejected KYC blocks account opening")
     void kycRejectionBlocksAccountOpening() {
         OnboardingResponse ob = onboardingService.initiateOnboarding(
-                buildOnboardingRequest("reject.e2e@example.com", "+447700900112", "XYZPQ5678G", null));
+                buildOnboardingRequest("reject.e2e@example.com", "+447700900112", "XYZPQ5678G"));
 
         CustomerResponse rejected = onboardingService.updateKycStatus(new KycUpdateRequest(
                 ob.customerId(), Customer.KycStatus.REJECTED, "Document photo was blurry"));
@@ -148,10 +148,10 @@ class BankingEndToEndIntegrationTest {
     @DisplayName("Duplicate email is rejected")
     void duplicateEmail_isRejected() {
         onboardingService.initiateOnboarding(
-                buildOnboardingRequest("dup@example.com", "+447700900001", "ABCDE1234F", null));
+                buildOnboardingRequest("dup@example.com", "+447700900001", "ABCDE1234F"));
         assertThatThrownBy(() ->
             onboardingService.initiateOnboarding(
-                buildOnboardingRequest("dup@example.com", "+447700900002", "LMNOP5432H", null)))
+                buildOnboardingRequest("dup@example.com", "+447700900002", "LMNOP5432H")))
             .isInstanceOf(DuplicateResourceException.class)
             .hasMessageContaining("email: dup@example.com");
     }
@@ -160,10 +160,10 @@ class BankingEndToEndIntegrationTest {
     @DisplayName("Duplicate PAN is rejected")
     void duplicatePan_isRejected() {
         onboardingService.initiateOnboarding(
-                buildOnboardingRequest("a@example.com", "+447700900010", "AAAAA1111A", null));
+                buildOnboardingRequest("a@example.com", "+447700900010", "AAAAA1111A"));
         assertThatThrownBy(() ->
             onboardingService.initiateOnboarding(
-                buildOnboardingRequest("b@example.com", "+447700900011", "AAAAA1111A", null)))
+                buildOnboardingRequest("b@example.com", "+447700900011", "AAAAA1111A")))
             .isInstanceOf(DuplicateResourceException.class)
             .hasMessageContaining("PAN");
     }
@@ -174,7 +174,7 @@ class BankingEndToEndIntegrationTest {
     @DisplayName("Account cannot be opened if KYC not verified")
     void accountOpeningRequiresKycVerified() {
         OnboardingResponse ob = onboardingService.initiateOnboarding(
-                buildOnboardingRequest("kyc.pending@example.com", "+447700900200", "BBBBB2222B", null));
+                buildOnboardingRequest("kyc.pending@example.com", "+447700900200", "BBBBB2222B"));
         String id = ob.customerId();
         assertThatThrownBy(() -> accountService.openAccount(
                 new OpenAccountRequest(id, Account.AccountType.SAVINGS, "GBP", null, null, null, null)))
@@ -186,7 +186,7 @@ class BankingEndToEndIntegrationTest {
     @DisplayName("Account cannot be opened if onboarding not explicitly completed")
     void accountOpeningRequiresOnboardingComplete() {
         OnboardingResponse ob = onboardingService.initiateOnboarding(
-                buildOnboardingRequest("kyc.notcomplete@example.com", "+447700900201", "CCCCC3333C", null));
+                buildOnboardingRequest("kyc.notcomplete@example.com", "+447700900201", "CCCCC3333C"));
         onboardingService.updateKycStatus(
                 new KycUpdateRequest(ob.customerId(), Customer.KycStatus.VERIFIED, null));
         String id = ob.customerId();
@@ -420,7 +420,7 @@ class BankingEndToEndIntegrationTest {
     @DisplayName("Customer can be retrieved by ID and by email with correct field values")
     void customerQueries_byIdAndEmail() {
         OnboardingResponse ob = onboardingService.initiateOnboarding(
-                buildOnboardingRequest("query.test@example.com", "+447700907001", "QUERY1234F", null));
+                buildOnboardingRequest("query.test@example.com", "+447700907001", "QUERY1234F"));
 
         CustomerResponse byId = onboardingService.getCustomer(ob.customerId());
         assertThat(byId.email()).isEqualTo("query.test@example.com");
@@ -472,9 +472,9 @@ class BankingEndToEndIntegrationTest {
     @DisplayName("getPendingKycCustomers returns customers with UNDER_REVIEW status")
     void pendingKycQueue_returnsUnderReviewCustomers() {
         OnboardingResponse ob1 = onboardingService.initiateOnboarding(
-                buildOnboardingRequest("pending1@example.com", "+447700909001", "PENDA1234F", null));
+                buildOnboardingRequest("pending1@example.com", "+447700909001", "PENDA1234F"));
         OnboardingResponse ob2 = onboardingService.initiateOnboarding(
-                buildOnboardingRequest("pending2@example.com", "+447700909002", "PENDB1234G", null));
+                buildOnboardingRequest("pending2@example.com", "+447700909002", "PENDB1234G"));
 
         onboardingService.updateKycStatus(
                 new KycUpdateRequest(ob1.customerId(), Customer.KycStatus.UNDER_REVIEW, null));

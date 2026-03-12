@@ -6,11 +6,11 @@ import com.banking.fraud.service.FraudDetectionService;
 import com.banking.payment.domain.Payment;
 import com.banking.payment.dto.PaymentDtos.DailySpendingSummary;
 import com.banking.payment.service.PaymentService;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -24,12 +24,9 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("Fraud rules and detection")
 class FraudRulesAndDetectionTest {
 
     @Mock PaymentService paymentService;
-
-    // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private Payment buildPayment(BigDecimal amount, Payment.PaymentType type) {
         return Payment.builder()
@@ -47,325 +44,284 @@ class FraudRulesAndDetectionTest {
                 BigDecimal.valueOf(50000), BigDecimal.valueOf(75000), "USD");
     }
 
-    // ─── HighValueRule ────────────────────────────────────────────────────────
+    // ── HighValueRule ──────────────────────────────────────────────────────────
 
-    @Nested @DisplayName("HighValueRule")
-    class HighValueRuleTest {
-        private HighValueRule rule;
-        @BeforeEach void init() { rule = new HighValueRule(); }
+    @ParameterizedTest
+    @CsvSource({
+        "1000,    false, 0.00",
+        "10000,   false, 0.00",
+        "10001,   true,  0.15",
+        "50000,   true,  0.15",
+        "50001,   true,  0.30",
+        "100000,  true,  0.30",
+        "100001,  true,  0.45",
+        "999999,  true,  0.45"
+    })
+    void highValueRule_thresholds(double amount, boolean triggered, double score) {
+        var rule   = new HighValueRule();
+        var result = rule.evaluate(buildPayment(BigDecimal.valueOf(amount), Payment.PaymentType.IMPS), paymentService);
+        assertThat(result.triggered()).isEqualTo(triggered);
+        assertThat(result.scoreContribution()).isEqualTo(score);
+        assertThat(result.ruleName()).isEqualTo("HIGH_VALUE");
+    }
 
-        @ParameterizedTest(name = "{0} → triggered={1}, score={2}")
-        @CsvSource({
-            "1000,    false, 0.00",
-            "10000,   false, 0.00",
-            "10001,   true,  0.15",
-            "50000,   true,  0.15",
-            "50001,   true,  0.30",
-            "100000,  true,  0.30",
-            "100001,  true,  0.45",
-            "999999,  true,  0.45"
-        })
-        void thresholds(double amount, boolean triggered, double score) {
-            var result = rule.evaluate(buildPayment(BigDecimal.valueOf(amount), Payment.PaymentType.IMPS), paymentService);
-            assertThat(result.triggered()).isEqualTo(triggered);
-            assertThat(result.scoreContribution()).isEqualTo(score);
-            assertThat(result.ruleName()).isEqualTo("HIGH_VALUE");
+    // ── VelocityRule ───────────────────────────────────────────────────────────
+
+    @Test
+    void velocityRule_zeroPayments_notTriggered() {
+        when(paymentService.getRecentPayments(anyString(), eq(1))).thenReturn(List.of());
+        var result = new VelocityRule().evaluate(buildPayment(BigDecimal.ONE, Payment.PaymentType.IMPS), paymentService);
+        assertThat(result.triggered()).isFalse();
+        assertThat(result.scoreContribution()).isZero();
+    }
+
+    @Test
+    void velocityRule_fourPayments_notTriggered() {
+        when(paymentService.getRecentPayments(anyString(), eq(1)))
+                .thenReturn(Collections.nCopies(4, buildPayment(BigDecimal.ONE, Payment.PaymentType.IMPS)));
+        assertThat(new VelocityRule().evaluate(
+                buildPayment(BigDecimal.ONE, Payment.PaymentType.IMPS), paymentService).triggered()).isFalse();
+    }
+
+    @Test
+    void velocityRule_fivePayments_triggeredWithScore025() {
+        when(paymentService.getRecentPayments(anyString(), eq(1)))
+                .thenReturn(Collections.nCopies(5, buildPayment(BigDecimal.ONE, Payment.PaymentType.IMPS)));
+        var result = new VelocityRule().evaluate(buildPayment(BigDecimal.ONE, Payment.PaymentType.IMPS), paymentService);
+        assertThat(result.triggered()).isTrue();
+        assertThat(result.scoreContribution()).isEqualTo(0.25);
+    }
+
+    @Test
+    void velocityRule_tenPayments_criticalVelocityScore040() {
+        when(paymentService.getRecentPayments(anyString(), eq(1)))
+                .thenReturn(Collections.nCopies(10, buildPayment(BigDecimal.ONE, Payment.PaymentType.IMPS)));
+        var result = new VelocityRule().evaluate(buildPayment(BigDecimal.ONE, Payment.PaymentType.IMPS), paymentService);
+        assertThat(result.triggered()).isTrue();
+        assertThat(result.scoreContribution()).isEqualTo(0.40);
+    }
+
+    @Test
+    void velocityRule_fifteenPayments_stillCapsAtScore040() {
+        when(paymentService.getRecentPayments(anyString(), eq(1)))
+                .thenReturn(Collections.nCopies(15, buildPayment(BigDecimal.ONE, Payment.PaymentType.IMPS)));
+        assertThat(new VelocityRule().evaluate(
+                buildPayment(BigDecimal.ONE, Payment.PaymentType.IMPS), paymentService).scoreContribution()).isEqualTo(0.40);
+    }
+
+    // ── OffHoursRule ───────────────────────────────────────────────────────────
+
+    @Test
+    void offHoursRule_resultIsCoherentRegardlessOfSystemClock() {
+        var result = new OffHoursRule().evaluate(buildPayment(BigDecimal.ONE, Payment.PaymentType.IMPS), paymentService);
+        assertThat(result.ruleName()).isEqualTo("OFF_HOURS");
+        if (result.triggered()) {
+            assertThat(result.scoreContribution()).isEqualTo(0.10);
+            assertThat(result.description()).contains("unusual hour");
+        } else {
+            assertThat(result.scoreContribution()).isZero();
+            assertThat(result.description()).contains("Normal hours");
         }
     }
 
-    // ─── VelocityRule ─────────────────────────────────────────────────────────
+    // ── InternationalWireRule ──────────────────────────────────────────────────
 
-    @Nested @DisplayName("VelocityRule")
-    class VelocityRuleTest {
-        private VelocityRule rule;
-        @BeforeEach void init() { rule = new VelocityRule(); }
-
-        @Test void zeroPayments_notTriggered() {
-            when(paymentService.getRecentPayments(anyString(), eq(1))).thenReturn(List.of());
-            var r = rule.evaluate(buildPayment(BigDecimal.ONE, Payment.PaymentType.IMPS), paymentService);
-            assertThat(r.triggered()).isFalse();
-            assertThat(r.scoreContribution()).isZero();
-        }
-
-        @Test void fourPayments_notTriggered() {
-            when(paymentService.getRecentPayments(anyString(), eq(1)))
-                    .thenReturn(Collections.nCopies(4, buildPayment(BigDecimal.ONE, Payment.PaymentType.IMPS)));
-            var r = rule.evaluate(buildPayment(BigDecimal.ONE, Payment.PaymentType.IMPS), paymentService);
-            assertThat(r.triggered()).isFalse();
-        }
-
-        @Test void fivePayments_highVelocity_score025() {
-            when(paymentService.getRecentPayments(anyString(), eq(1)))
-                    .thenReturn(Collections.nCopies(5, buildPayment(BigDecimal.ONE, Payment.PaymentType.IMPS)));
-            var r = rule.evaluate(buildPayment(BigDecimal.ONE, Payment.PaymentType.IMPS), paymentService);
-            assertThat(r.triggered()).isTrue();
-            assertThat(r.scoreContribution()).isEqualTo(0.25);
-        }
-
-        @Test void tenPayments_criticalVelocity_score040() {
-            when(paymentService.getRecentPayments(anyString(), eq(1)))
-                    .thenReturn(Collections.nCopies(10, buildPayment(BigDecimal.ONE, Payment.PaymentType.IMPS)));
-            var r = rule.evaluate(buildPayment(BigDecimal.ONE, Payment.PaymentType.IMPS), paymentService);
-            assertThat(r.triggered()).isTrue();
-            assertThat(r.scoreContribution()).isEqualTo(0.40);
-        }
-
-        @Test void fifteenPayments_stillCritical_score040() {
-            when(paymentService.getRecentPayments(anyString(), eq(1)))
-                    .thenReturn(Collections.nCopies(15, buildPayment(BigDecimal.ONE, Payment.PaymentType.IMPS)));
-            var r = rule.evaluate(buildPayment(BigDecimal.ONE, Payment.PaymentType.IMPS), paymentService);
-            assertThat(r.scoreContribution()).isEqualTo(0.40);
-        }
+    @Test
+    void internationalWireRule_swiftPayment_triggeredWithScore015() {
+        var result = new InternationalWireRule().evaluate(buildPayment(BigDecimal.TEN, Payment.PaymentType.SWIFT), paymentService);
+        assertThat(result.triggered()).isTrue();
+        assertThat(result.scoreContribution()).isEqualTo(0.15);
     }
 
-    // ─── OffHoursRule ─────────────────────────────────────────────────────────
-
-    @Nested @DisplayName("OffHoursRule")
-    class OffHoursRuleTest {
-        private OffHoursRule rule;
-        @BeforeEach void init() { rule = new OffHoursRule(); }
-
-        @Test void currentHour_notOffHoursRange_mayReturnEitherResult() {
-            // We can't control system clock so just assert result fields are coherent
-            var r = rule.evaluate(buildPayment(BigDecimal.ONE, Payment.PaymentType.IMPS), paymentService);
-            assertThat(r.ruleName()).isEqualTo("OFF_HOURS");
-            if (r.triggered()) {
-                assertThat(r.scoreContribution()).isEqualTo(0.10);
-                assertThat(r.description()).contains("unusual hour");
-            } else {
-                assertThat(r.scoreContribution()).isZero();
-                assertThat(r.description()).contains("Normal hours");
-            }
-        }
+    @Test
+    void internationalWireRule_neftPayment_notTriggered() {
+        assertThat(new InternationalWireRule().evaluate(
+                buildPayment(BigDecimal.TEN, Payment.PaymentType.NEFT), paymentService).triggered()).isFalse();
     }
 
-    // ─── InternationalWireRule ────────────────────────────────────────────────
-
-    @Nested @DisplayName("InternationalWireRule")
-    class InternationalWireRuleTest {
-        private InternationalWireRule rule;
-        @BeforeEach void init() { rule = new InternationalWireRule(); }
-
-        @Test void swiftPayment_triggered_score015() {
-            var r = rule.evaluate(buildPayment(BigDecimal.TEN, Payment.PaymentType.SWIFT), paymentService);
-            assertThat(r.triggered()).isTrue();
-            assertThat(r.scoreContribution()).isEqualTo(0.15);
-        }
-
-        @Test void neftPayment_notTriggered() {
-            var r = rule.evaluate(buildPayment(BigDecimal.TEN, Payment.PaymentType.NEFT), paymentService);
-            assertThat(r.triggered()).isFalse();
-        }
-
-        @Test void impsPayment_notTriggered() {
-            var r = rule.evaluate(buildPayment(BigDecimal.TEN, Payment.PaymentType.IMPS), paymentService);
-            assertThat(r.triggered()).isFalse();
-        }
-
-        @Test void internalPayment_notTriggered() {
-            var r = rule.evaluate(buildPayment(BigDecimal.TEN, Payment.PaymentType.INTERNAL), paymentService);
-            assertThat(r.triggered()).isFalse();
-        }
-
-        @Test void upiPayment_notTriggered() {
-            var r = rule.evaluate(buildPayment(BigDecimal.TEN, Payment.PaymentType.UPI), paymentService);
-            assertThat(r.triggered()).isFalse();
-        }
+    @Test
+    void internationalWireRule_impsPayment_notTriggered() {
+        assertThat(new InternationalWireRule().evaluate(
+                buildPayment(BigDecimal.TEN, Payment.PaymentType.IMPS), paymentService).triggered()).isFalse();
     }
 
-    // ─── RoundAmountRule ──────────────────────────────────────────────────────
-
-    @Nested @DisplayName("RoundAmountRule")
-    class RoundAmountRuleTest {
-        private RoundAmountRule rule;
-        @BeforeEach void init() { rule = new RoundAmountRule(); }
-
-        @ParameterizedTest(name = "{0} → triggered={1}")
-        @CsvSource({
-            "1000,   true",
-            "5000,   true",
-            "100000, true",
-            "999,    false",
-            "1001,   false",
-            "5500,   false",
-            "123.45, false"
-        })
-        void roundnessDetection(double amount, boolean triggered) {
-            var r = rule.evaluate(buildPayment(BigDecimal.valueOf(amount), Payment.PaymentType.IMPS), paymentService);
-            assertThat(r.triggered()).isEqualTo(triggered);
-            assertThat(r.ruleName()).isEqualTo("ROUND_AMOUNT");
-            if (triggered) assertThat(r.scoreContribution()).isEqualTo(0.08);
-            else assertThat(r.scoreContribution()).isZero();
-        }
+    @Test
+    void internationalWireRule_internalPayment_notTriggered() {
+        assertThat(new InternationalWireRule().evaluate(
+                buildPayment(BigDecimal.TEN, Payment.PaymentType.INTERNAL), paymentService).triggered()).isFalse();
     }
 
-    // ─── DailyLimitRule ───────────────────────────────────────────────────────
-
-    @Nested @DisplayName("DailyLimitRule")
-    class DailyLimitRuleTest {
-        private DailyLimitRule rule;
-        @BeforeEach void init() { rule = new DailyLimitRule(); }
-
-        @Test void projectedTotalExceeds200k_triggered() {
-            // 150k spent + 60k new = 210k > 200k threshold
-            when(paymentService.getDailySpendingSummary("ACC-SRC"))
-                    .thenReturn(dailySummary(new BigDecimal("150000")));
-            var r = rule.evaluate(buildPayment(new BigDecimal("60000"), Payment.PaymentType.SWIFT), paymentService);
-            assertThat(r.triggered()).isTrue();
-            assertThat(r.scoreContribution()).isEqualTo(0.25);
-        }
-
-        @Test void projectedTotalExactly200k_notTriggered() {
-            // 100k + 100k = 200k, not exceeding
-            when(paymentService.getDailySpendingSummary("ACC-SRC"))
-                    .thenReturn(dailySummary(new BigDecimal("100000")));
-            var r = rule.evaluate(buildPayment(new BigDecimal("100000"), Payment.PaymentType.NEFT), paymentService);
-            assertThat(r.triggered()).isFalse();
-        }
-
-        @Test void projectedTotalBelow200k_notTriggered() {
-            when(paymentService.getDailySpendingSummary("ACC-SRC"))
-                    .thenReturn(dailySummary(new BigDecimal("50000")));
-            var r = rule.evaluate(buildPayment(new BigDecimal("50000"), Payment.PaymentType.IMPS), paymentService);
-            assertThat(r.triggered()).isFalse();
-        }
-
-        @Test void noSpendingToday_smallPayment_notTriggered() {
-            when(paymentService.getDailySpendingSummary("ACC-SRC"))
-                    .thenReturn(dailySummary(BigDecimal.ZERO));
-            var r = rule.evaluate(buildPayment(new BigDecimal("1000"), Payment.PaymentType.IMPS), paymentService);
-            assertThat(r.triggered()).isFalse();
-        }
+    @Test
+    void internationalWireRule_upiPayment_notTriggered() {
+        assertThat(new InternationalWireRule().evaluate(
+                buildPayment(BigDecimal.TEN, Payment.PaymentType.UPI), paymentService).triggered()).isFalse();
     }
 
-    // ─── FraudAnalysis domain ─────────────────────────────────────────────────
+    // ── RoundAmountRule ────────────────────────────────────────────────────────
 
-    @Nested @DisplayName("FraudAnalysis — decide() and classify()")
-    class FraudAnalysisDomainTest {
-
-        @ParameterizedTest(name = "score={0} → {1}")
-        @CsvSource({
-            "0.00, APPROVE",
-            "0.39, APPROVE",
-            "0.40, HOLD_FOR_REVIEW",
-            "0.69, HOLD_FOR_REVIEW",
-            "0.70, BLOCK",
-            "1.00, BLOCK"
-        })
-        void decide_thresholds(double score, FraudAnalysis.FraudDecision expected) {
-            assertThat(FraudAnalysis.decide(score)).isEqualTo(expected);
-        }
-
-        @ParameterizedTest(name = "score={0} → {1}")
-        @CsvSource({
-            "0.00, LOW",
-            "0.24, LOW",
-            "0.25, MEDIUM",
-            "0.49, MEDIUM",
-            "0.50, HIGH",
-            "0.74, HIGH",
-            "0.75, CRITICAL",
-            "1.00, CRITICAL"
-        })
-        void classify_levels(double score, Payment.FraudRiskLevel expected) {
-            assertThat(FraudAnalysis.classify(score)).isEqualTo(expected);
-        }
-
-        @Test void isHighRisk_true_forHighAndCritical() {
-            var h = new FraudAnalysis("P", 0.55, Payment.FraudRiskLevel.HIGH,
-                    List.of(), List.of(), FraudAnalysis.FraudDecision.HOLD_FOR_REVIEW, "", LocalDateTime.now());
-            var c = new FraudAnalysis("P", 0.90, Payment.FraudRiskLevel.CRITICAL,
-                    List.of(), List.of(), FraudAnalysis.FraudDecision.BLOCK, "", LocalDateTime.now());
-            assertThat(h.isHighRisk()).isTrue();
-            assertThat(c.isHighRisk()).isTrue();
-        }
-
-        @Test void isHighRisk_false_forLowAndMedium() {
-            var l = new FraudAnalysis("P", 0.10, Payment.FraudRiskLevel.LOW,
-                    List.of(), List.of(), FraudAnalysis.FraudDecision.APPROVE, "", LocalDateTime.now());
-            var m = new FraudAnalysis("P", 0.35, Payment.FraudRiskLevel.MEDIUM,
-                    List.of(), List.of(), FraudAnalysis.FraudDecision.APPROVE, "", LocalDateTime.now());
-            assertThat(l.isHighRisk()).isFalse();
-            assertThat(m.isHighRisk()).isFalse();
-        }
+    @ParameterizedTest
+    @CsvSource({
+        "1000,   true",
+        "5000,   true",
+        "100000, true",
+        "999,    false",
+        "1001,   false",
+        "5500,   false",
+        "123.45, false"
+    })
+    void roundAmountRule_detectsRoundNumbers(double amount, boolean triggered) {
+        var rule   = new RoundAmountRule();
+        var result = rule.evaluate(buildPayment(BigDecimal.valueOf(amount), Payment.PaymentType.IMPS), paymentService);
+        assertThat(result.triggered()).isEqualTo(triggered);
+        assertThat(result.ruleName()).isEqualTo("ROUND_AMOUNT");
+        assertThat(result.scoreContribution()).isEqualTo(triggered ? 0.08 : 0.0);
     }
 
-    // ─── FraudDetectionService ────────────────────────────────────────────────
+    // ── DailyLimitRule ─────────────────────────────────────────────────────────
 
-    @Nested @DisplayName("FraudDetectionService — score clamping and rule aggregation")
-    class FraudDetectionServiceTest {
+    @Test
+    void dailyLimitRule_projectedTotalExceeds200k_triggered() {
+        when(paymentService.getDailySpendingSummary("ACC-SRC")).thenReturn(dailySummary(new BigDecimal("150000")));
+        var result = new DailyLimitRule().evaluate(buildPayment(new BigDecimal("60000"), Payment.PaymentType.SWIFT), paymentService);
+        assertThat(result.triggered()).isTrue();
+        assertThat(result.scoreContribution()).isEqualTo(0.25);
+    }
 
-        @Test @DisplayName("Score is clamped to 1.0 when rules sum exceeds 1.0")
-        void scoreClampedAt1_whenMultipleRulesExceedMax() {
-            // HIGH_VALUE critical (0.45) + VELOCITY critical (0.40) + SWIFT (0.15) + ROUND (0.08)
-            // = 1.08 → clamped to 1.0
-            FraudRule alwaysHigh = (p, ps) -> new FraudRuleResult("R1", true, 0.60, "desc");
-            FraudRule alsoHigh   = (p, ps) -> new FraudRuleResult("R2", true, 0.60, "desc");
-            var service = new FraudDetectionService(List.of(alwaysHigh, alsoHigh), paymentService);
+    @Test
+    void dailyLimitRule_projectedTotalExactly200k_notTriggered() {
+        when(paymentService.getDailySpendingSummary("ACC-SRC")).thenReturn(dailySummary(new BigDecimal("100000")));
+        assertThat(new DailyLimitRule().evaluate(
+                buildPayment(new BigDecimal("100000"), Payment.PaymentType.NEFT), paymentService).triggered()).isFalse();
+    }
 
-            Payment p = buildPayment(BigDecimal.TEN, Payment.PaymentType.IMPS);
-            when(paymentService.findPayment("PAY-001")).thenReturn(p);
+    @Test
+    void dailyLimitRule_projectedTotalBelow200k_notTriggered() {
+        when(paymentService.getDailySpendingSummary("ACC-SRC")).thenReturn(dailySummary(new BigDecimal("50000")));
+        assertThat(new DailyLimitRule().evaluate(
+                buildPayment(new BigDecimal("50000"), Payment.PaymentType.IMPS), paymentService).triggered()).isFalse();
+    }
 
-            FraudAnalysis result = service.analysePayment("PAY-001");
+    @Test
+    void dailyLimitRule_noSpendingAndSmallPayment_notTriggered() {
+        when(paymentService.getDailySpendingSummary("ACC-SRC")).thenReturn(dailySummary(BigDecimal.ZERO));
+        assertThat(new DailyLimitRule().evaluate(
+                buildPayment(new BigDecimal("1000"), Payment.PaymentType.IMPS), paymentService).triggered()).isFalse();
+    }
 
-            assertThat(result.fraudScore()).isEqualTo(1.0);
-            assertThat(result.decision()).isEqualTo(FraudAnalysis.FraudDecision.BLOCK);
-        }
+    // ── FraudAnalysis.decide / .classify ──────────────────────────────────────
 
-        @Test @DisplayName("No rules triggered → APPROVE with LOW risk")
-        void noRulesTriggered_approve() {
-            FraudRule safe = (p, ps) -> new FraudRuleResult("SAFE", false, 0.0, "OK");
-            var service = new FraudDetectionService(List.of(safe), paymentService);
+    @ParameterizedTest
+    @CsvSource({
+        "0.00, APPROVE",
+        "0.39, APPROVE",
+        "0.40, HOLD_FOR_REVIEW",
+        "0.69, HOLD_FOR_REVIEW",
+        "0.70, BLOCK",
+        "1.00, BLOCK"
+    })
+    void fraudAnalysis_decide_returnsCorrectDecision(double score, FraudAnalysis.FraudDecision expected) {
+        assertThat(FraudAnalysis.decide(score)).isEqualTo(expected);
+    }
 
-            Payment p = buildPayment(BigDecimal.TEN, Payment.PaymentType.IMPS);
-            when(paymentService.findPayment("PAY-001")).thenReturn(p);
+    @ParameterizedTest
+    @CsvSource({
+        "0.00, LOW",
+        "0.24, LOW",
+        "0.25, MEDIUM",
+        "0.49, MEDIUM",
+        "0.50, HIGH",
+        "0.74, HIGH",
+        "0.75, CRITICAL",
+        "1.00, CRITICAL"
+    })
+    void fraudAnalysis_classify_returnsCorrectRiskLevel(double score, Payment.FraudRiskLevel expected) {
+        assertThat(FraudAnalysis.classify(score)).isEqualTo(expected);
+    }
 
-            FraudAnalysis result = service.analysePayment("PAY-001");
+    @Test
+    void fraudAnalysis_isHighRisk_returnsTrue_forHighAndCritical() {
+        var high     = new FraudAnalysis("P", 0.55, Payment.FraudRiskLevel.HIGH,
+                List.of(), List.of(), FraudAnalysis.FraudDecision.HOLD_FOR_REVIEW, "", LocalDateTime.now());
+        var critical = new FraudAnalysis("P", 0.90, Payment.FraudRiskLevel.CRITICAL,
+                List.of(), List.of(), FraudAnalysis.FraudDecision.BLOCK, "", LocalDateTime.now());
+        assertThat(high.isHighRisk()).isTrue();
+        assertThat(critical.isHighRisk()).isTrue();
+    }
 
-            assertThat(result.fraudScore()).isZero();
-            assertThat(result.decision()).isEqualTo(FraudAnalysis.FraudDecision.APPROVE);
-            assertThat(result.riskLevel()).isEqualTo(Payment.FraudRiskLevel.LOW);
-            assertThat(result.triggeredRules()).isEmpty();
-        }
+    @Test
+    void fraudAnalysis_isHighRisk_returnsFalse_forLowAndMedium() {
+        var low    = new FraudAnalysis("P", 0.10, Payment.FraudRiskLevel.LOW,
+                List.of(), List.of(), FraudAnalysis.FraudDecision.APPROVE, "", LocalDateTime.now());
+        var medium = new FraudAnalysis("P", 0.35, Payment.FraudRiskLevel.MEDIUM,
+                List.of(), List.of(), FraudAnalysis.FraudDecision.APPROVE, "", LocalDateTime.now());
+        assertThat(low.isHighRisk()).isFalse();
+        assertThat(medium.isHighRisk()).isFalse();
+    }
 
-        @Test @DisplayName("Score 0.55 → HOLD_FOR_REVIEW with HIGH risk")
-        void midScore_holdForReview() {
-            FraudRule r = (p, ps) -> new FraudRuleResult("MID", true, 0.55, "moderate risk");
-            var service = new FraudDetectionService(List.of(r), paymentService);
+    // ── FraudDetectionService ──────────────────────────────────────────────────
 
-            Payment p = buildPayment(BigDecimal.TEN, Payment.PaymentType.IMPS);
-            when(paymentService.findPayment("PAY-001")).thenReturn(p);
+    @Test
+    void fraudDetectionService_scoreExceeds1_clampedAt1AndDecisionIsBlock() {
+        FraudRule r1      = (p, ps) -> new FraudRuleResult("R1", true, 0.60, "desc");
+        FraudRule r2      = (p, ps) -> new FraudRuleResult("R2", true, 0.60, "desc");
+        var service       = new FraudDetectionService(List.of(r1, r2), paymentService);
+        Payment payment   = buildPayment(BigDecimal.TEN, Payment.PaymentType.IMPS);
+        when(paymentService.findPayment("PAY-001")).thenReturn(payment);
 
-            FraudAnalysis result = service.analysePayment("PAY-001");
+        FraudAnalysis result = service.analysePayment("PAY-001");
 
-            assertThat(result.decision()).isEqualTo(FraudAnalysis.FraudDecision.HOLD_FOR_REVIEW);
-            assertThat(result.triggeredRules()).hasSize(1);
-        }
+        assertThat(result.fraudScore()).isEqualTo(1.0);
+        assertThat(result.decision()).isEqualTo(FraudAnalysis.FraudDecision.BLOCK);
+    }
 
-        @Test @DisplayName("analysePaymentDirect — accepts Payment object directly")
-        void analysePaymentDirect_worksWithoutRepository() {
-            FraudRule r = (p, ps) -> new FraudRuleResult("X", false, 0.0, "safe");
-            var service = new FraudDetectionService(List.of(r), paymentService);
+    @Test
+    void fraudDetectionService_noRulesTriggered_approveWithLowRisk() {
+        FraudRule safe  = (p, ps) -> new FraudRuleResult("SAFE", false, 0.0, "OK");
+        var service     = new FraudDetectionService(List.of(safe), paymentService);
+        Payment payment = buildPayment(BigDecimal.TEN, Payment.PaymentType.IMPS);
+        when(paymentService.findPayment("PAY-001")).thenReturn(payment);
 
-            Payment p = buildPayment(BigDecimal.TEN, Payment.PaymentType.IMPS);
-            FraudAnalysis result = service.analysePaymentDirect(p);
+        FraudAnalysis result = service.analysePayment("PAY-001");
 
-            assertThat(result.paymentId()).isEqualTo("PAY-001");
-            verify(paymentService, never()).findPayment(any());
-        }
+        assertThat(result.fraudScore()).isZero();
+        assertThat(result.decision()).isEqualTo(FraudAnalysis.FraudDecision.APPROVE);
+        assertThat(result.riskLevel()).isEqualTo(Payment.FraudRiskLevel.LOW);
+        assertThat(result.triggeredRules()).isEmpty();
+    }
 
-        @Test @DisplayName("All rule results are present in analysis even if not triggered")
-        void allRuleResults_inAnalysis_evenIfNotTriggered() {
-            FraudRule triggered = (p, ps) -> new FraudRuleResult("R_ON",  true,  0.20, "triggered");
-            FraudRule safe      = (p, ps) -> new FraudRuleResult("R_OFF", false, 0.00, "safe");
-            var service = new FraudDetectionService(List.of(triggered, safe), paymentService);
+    @Test
+    void fraudDetectionService_midScore_holdForReviewDecision() {
+        FraudRule r  = (p, ps) -> new FraudRuleResult("MID", true, 0.55, "moderate");
+        var service  = new FraudDetectionService(List.of(r), paymentService);
+        Payment payment = buildPayment(BigDecimal.TEN, Payment.PaymentType.IMPS);
+        when(paymentService.findPayment("PAY-001")).thenReturn(payment);
 
-            Payment p = buildPayment(BigDecimal.TEN, Payment.PaymentType.IMPS);
-            when(paymentService.findPayment("PAY-001")).thenReturn(p);
+        assertThat(service.analysePayment("PAY-001").decision())
+                .isEqualTo(FraudAnalysis.FraudDecision.HOLD_FOR_REVIEW);
+    }
 
-            FraudAnalysis result = service.analysePayment("PAY-001");
-            assertThat(result.ruleResults()).hasSize(2);
-            assertThat(result.triggeredRules()).hasSize(1); // only triggered ones
-        }
+    @Test
+    void fraudDetectionService_analysePaymentDirect_doesNotHitRepository() {
+        FraudRule safe = (p, ps) -> new FraudRuleResult("X", false, 0.0, "safe");
+        var service    = new FraudDetectionService(List.of(safe), paymentService);
+        Payment payment = buildPayment(BigDecimal.TEN, Payment.PaymentType.IMPS);
+
+        FraudAnalysis result = service.analysePaymentDirect(payment);
+
+        assertThat(result.paymentId()).isEqualTo("PAY-001");
+        verify(paymentService, never()).findPayment(any());
+    }
+
+    @Test
+    void fraudDetectionService_allRuleResults_includedEvenIfNotTriggered() {
+        FraudRule on  = (p, ps) -> new FraudRuleResult("R_ON",  true,  0.20, "triggered");
+        FraudRule off = (p, ps) -> new FraudRuleResult("R_OFF", false, 0.00, "safe");
+        var service   = new FraudDetectionService(List.of(on, off), paymentService);
+        when(paymentService.findPayment("PAY-001")).thenReturn(buildPayment(BigDecimal.TEN, Payment.PaymentType.IMPS));
+
+        FraudAnalysis result = service.analysePayment("PAY-001");
+
+        assertThat(result.ruleResults()).hasSize(2);
+        assertThat(result.triggeredRules()).hasSize(1);
     }
 }
