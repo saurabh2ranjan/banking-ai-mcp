@@ -21,6 +21,7 @@ spring:
       path: /h2-console
 
   jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: create-drop
     show-sql: false
@@ -36,7 +37,7 @@ spring:
         # Hibernate's Jackson-based JSON type handling to prevent Dialect.java crash
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY:your-openai-api-key-here}
+      api-key: ${OPENAI_API_KEY}
       chat:
         options:
           model: gpt-4o
@@ -78,9 +79,11 @@ management:
 
 logging:
   level:
-    com.banking:          DEBUG
+    com.banking: DEBUG
     org.springframework.ai: INFO
     org.springframework.security: WARN
-    org.hibernate.SQL:    WARN
+    #org.springframework.boot.autoconfigure.h2: DEBUG
+    #org.springframework.boot.autoconfigure.condition: DEBUG
+    org.hibernate.SQL: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId}] %logger{36} - %msg%n"

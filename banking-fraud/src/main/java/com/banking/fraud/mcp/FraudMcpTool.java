@@ -2,6 +2,7 @@ package com.banking.fraud.mcp;
 
 import com.banking.common.exception.BankingExceptions.BankingException;
 import com.banking.fraud.domain.FraudAnalysis;
+import com.banking.fraud.rules.FraudRules;
 import com.banking.fraud.service.FraudDetectionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,7 +39,7 @@ public class FraudMcpTool {
                 "reasoning",      analysis.reasoning(),
                 "analysedAt",     analysis.analysedAt().toString(),
                 "ruleBreakdown",  analysis.ruleResults().stream()
-                    .filter(r -> r.triggered())
+                    .filter(FraudRules.FraudRuleResult::triggered)
                     .map(r -> r.ruleName() + " (+" + String.format("%.2f", r.scoreContribution()) + "): " + r.description())
                     .collect(Collectors.toList())
             );

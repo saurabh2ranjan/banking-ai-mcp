@@ -30,6 +30,9 @@ dependencies {
     implementation 'io.micrometer:micrometer-registry-prometheus'
 
     runtimeOnly 'com.h2database:h2'
+    // Explicit dependency for H2 console in Spring Boot 4
+    implementation 'org.springframework.boot:spring-boot-h2console'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools' // Optional, but enables H2 console by default in dev
 
     // Spring Boot 4 modularised test infrastructure — each slice needs its own starter
     testImplementation 'org.springframework.boot:spring-boot-starter-test'

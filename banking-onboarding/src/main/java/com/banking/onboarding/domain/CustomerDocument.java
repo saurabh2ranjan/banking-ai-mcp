@@ -20,7 +20,7 @@ public class CustomerDocument extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @JdbcTypeCode(SqlTypes.VARCHAR)  // force VARCHAR(36) not BINARY(16)
+    @JdbcTypeCode(SqlTypes.VARCHAR)   // Hibernate 7 default is BINARY(16); force VARCHAR for String field
     private String documentId;
 
     @ManyToOne(fetch = FetchType.LAZY)

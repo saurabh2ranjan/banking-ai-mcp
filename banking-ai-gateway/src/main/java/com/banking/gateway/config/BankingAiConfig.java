@@ -75,6 +75,7 @@ public class BankingAiConfig {
             10. For compliance: summarise all fraud decisions with score, level, triggered rules, and action taken.
 
             Be professional, precise, and always prioritise customer safety over transaction speed.
+            RESPONSE FORMAT: Always respond in plain text only. Never use markdown, bullet points, bold (**), or numbered lists.
             """;
 
     /**
@@ -83,7 +84,7 @@ public class BankingAiConfig {
      * in each @SpringBootTest class provides mock beans instead. No conflict, no overriding needed.
      */
     @Bean
-    @ConditionalOnMissingBean(ToolCallbackProvider.class)
+    @ConditionalOnMissingBean(ToolCallbackProvider.class) //  registers the real banking methods as AI-callable tools
     public ToolCallbackProvider allBankingMcpTools(
             OnboardingMcpTool onboardingMcpTool,
             AccountMcpTool    accountMcpTool,
@@ -92,11 +93,20 @@ public class BankingAiConfig {
 
         return MethodToolCallbackProvider.builder()
                 .toolObjects(
-                    unwrap(onboardingMcpTool),
-                    unwrap(accountMcpTool),
-                    unwrap(paymentMcpTool),
-                    unwrap(fraudMcpTool))
+                        unwrap(onboardingMcpTool),
+                        unwrap(accountMcpTool),
+                        unwrap(paymentMcpTool),
+                        unwrap(fraudMcpTool))
                 .build();
+
+
+                /* Spring AI inspects these classes via reflection, finds methods annotated with @Tool,
+                   and converts them into OpenAI function-call definitions. GPT-4o receives a list like :
+                    json[
+                            { "name": "get_account_balance", "description": "...", "parameters": {...} },
+                    { "name": "analyse_payment_fraud_risk", "description": "...", "parameters": {...} }
+                    ]*/
+
     }
 
     @Bean
@@ -104,12 +114,33 @@ public class BankingAiConfig {
     public ChatClient bankingChatClient(ChatModel chatModel,
                                         ToolCallbackProvider allBankingMcpTools) {
         return ChatClient.builder(chatModel)
-                .defaultSystem(SYSTEM_PROMPT)
-                .defaultToolCallbacks(allBankingMcpTools)
+                .defaultSystem(SYSTEM_PROMPT) // injected into every request
+                .defaultToolCallbacks(allBankingMcpTools)  // ← tools available on every call
                 .build();
+        /*
+            ### The System Prompt — What Makes the AI "Banking-aware"
+
+                It does three things:
+
+                | Section | Purpose |
+                |---|---|
+                | Tool inventory | Tells GPT-4o what tools exist and what they do |
+                | Mandatory rules | Enforces business logic (fraud thresholds, KYC gate, etc.) |
+                | Behavioral guidelines | Professional tone, no stack traces leaked, audit trail |
+
+                The fraud rule is especially important — it's **enforced via prompt, not code**:
+                ```
+                Score < 0.40  → call process_payment
+                Score 0.40–0.70 → call hold_payment_for_fraud
+                Score ≥ 0.70  → hold AND consider block_account
+
+            GPT-4o reads this and decides which tools to chain. Your Java code never hardcodes this logic.
+         */
     }
 
     private Object unwrap(Object bean) {
+        //Spring wraps beans in AOP proxies for `@Transactional`, `@Cacheable`, etc. `MethodToolCallbackProvider` uses reflection to read `@Tool` annotations
+        // — which exist on the **real class**, not the proxy. Without unwrapping, tool discovery would silently fail. unwrap() is only used once at startup for scanning.
         try {
             if (AopUtils.isAopProxy(bean)) {
                 return AopProxyUtils.getSingletonTarget(bean);

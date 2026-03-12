@@ -103,7 +103,7 @@ public class PaymentService {
                                         Payment.FraudRiskLevel riskLevel, String reason) {
         Payment payment = findPayment(paymentId);
         payment.setStatus(Payment.PaymentStatus.FRAUD_HOLD);
-        payment.setFraudScore(BigDecimal.valueOf(fraudScore));
+        payment.setFraudScore(java.math.BigDecimal.valueOf(fraudScore));
         payment.setFraudRiskLevel(riskLevel);
         payment.setFailureReason(reason);
         // Hold stays in place — amount not released
