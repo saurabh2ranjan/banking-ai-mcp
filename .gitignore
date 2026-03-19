@@ -67,3 +67,6 @@ coverage/
 .eslintcache
 *.tsbuildinfo
 .npm/
+
+# ── Claude Code ───────────────────────────────────────────────────────────────
+.claude/settings.local.json

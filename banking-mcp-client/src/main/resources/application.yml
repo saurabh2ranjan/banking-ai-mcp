@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: banking-mcp-client
+
+  ai:
+    mcp:
+      client:
+        # Each entry creates one McpSyncClient bean.
+        # The gateway runs a SYNC/WebMVC MCP server — SSE at /sse, messages at /mcp/message.
+        connections:
+          banking-server:
+            url: http://localhost:8080   # banking-ai-gateway base URL
+
+server:
+  port: 8081   # different port so both apps can run together
+
+banking:
+  compliance:
+    kyc-check-enabled: true   # set false in prod if scheduling not needed
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

@@ -1,0 +1,18 @@
+plugins {
+    id 'org.springframework.boot'
+}
+
+dependencies {
+    // Spring Boot
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // Spring AI MCP Client (HTTP transport — connects to the gateway's WebMVC MCP server)
+    implementation 'org.springframework.ai:spring-ai-starter-mcp-client'
+
+    // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testRuntimeOnly    'org.junit.platform:junit-platform-launcher'
+}
