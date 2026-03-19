@@ -1,6 +1,8 @@
 package com.banking.common.exception;
 
+import lombok.Getter;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 
 /**
  * Exception hierarchy for the banking platform.
@@ -11,18 +13,17 @@ public class BankingExceptions {
 
     // ─── Base ────────────────────────────────────────────────────────────────
 
+    @Getter
     public static class BankingException extends RuntimeException {
-        private final String     errorCode;
-        private final HttpStatus httpStatus;
+        private final String         errorCode;
+        private final HttpStatusCode httpStatus;
 
-        public BankingException(String message, String errorCode, HttpStatus httpStatus) {
+        public BankingException(String message, String errorCode, HttpStatusCode httpStatus) {
             super(message);
             this.errorCode  = errorCode;
             this.httpStatus = httpStatus;
         }
 
-        public String     getErrorCode()  { return errorCode;  }
-        public HttpStatus getHttpStatus() { return httpStatus; }
     }
 
     // ─── Resource not found ──────────────────────────────────────────────────
@@ -49,7 +50,7 @@ public class BankingExceptions {
 
     public static class InsufficientFundsException extends BankingException {
         public InsufficientFundsException(String accountId) {
-            super("Insufficient funds in account: " + accountId, "INSUFFICIENT_FUNDS", HttpStatus.UNPROCESSABLE_ENTITY);
+            super("Insufficient funds in account: " + accountId, "INSUFFICIENT_FUNDS", HttpStatusCode.valueOf(422));
         }
     }
 
@@ -61,13 +62,13 @@ public class BankingExceptions {
 
     public static class AccountInactiveException extends BankingException {
         public AccountInactiveException(String accountId) {
-            super("Account is not active: " + accountId, "ACCOUNT_INACTIVE", HttpStatus.UNPROCESSABLE_ENTITY);
+            super("Account is not active: " + accountId, "ACCOUNT_INACTIVE", HttpStatusCode.valueOf(422));
         }
     }
 
     public static class DailyLimitExceededException extends BankingException {
         public DailyLimitExceededException(String accountId, String limit) {
-            super("Daily transfer limit exceeded for account " + accountId + ". Limit: " + limit, "DAILY_LIMIT_EXCEEDED", HttpStatus.UNPROCESSABLE_ENTITY);
+            super("Daily transfer limit exceeded for account " + accountId + ". Limit: " + limit, "DAILY_LIMIT_EXCEEDED", HttpStatusCode.valueOf(422));
         }
     }
 
@@ -92,7 +93,7 @@ public class BankingExceptions {
 
     public static class KycFailedException extends BankingException {
         public KycFailedException(String reason) {
-            super("KYC verification failed: " + reason, "KYC_FAILED", HttpStatus.UNPROCESSABLE_ENTITY);
+            super("KYC verification failed: " + reason, "KYC_FAILED", HttpStatusCode.valueOf(422));
         }
     }
 

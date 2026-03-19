@@ -3,6 +3,7 @@ package com.banking.common.exception;
 import com.banking.common.exception.BankingExceptions.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,7 +36,7 @@ class BankingExceptionsTest {
     void insufficientFundsException_hasCorrectErrorCodeAndStatus() {
         var ex = new InsufficientFundsException("ACC-001");
         assertThat(ex.getErrorCode()).isEqualTo("INSUFFICIENT_FUNDS");
-        assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(ex.getHttpStatus()).isEqualTo(HttpStatusCode.valueOf(422));
         assertThat(ex.getMessage()).contains("ACC-001");
     }
 
@@ -51,14 +52,14 @@ class BankingExceptionsTest {
     void accountInactiveException_hasCorrectErrorCodeAndStatus() {
         var ex = new AccountInactiveException("ACC-BLK");
         assertThat(ex.getErrorCode()).isEqualTo("ACCOUNT_INACTIVE");
-        assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(ex.getHttpStatus()).isEqualTo(HttpStatusCode.valueOf(422));
     }
 
     @Test
     void dailyLimitExceededException_hasCorrectErrorCodeAndStatus() {
         var ex = new DailyLimitExceededException("ACC-001", "10000");
         assertThat(ex.getErrorCode()).isEqualTo("DAILY_LIMIT_EXCEEDED");
-        assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(ex.getHttpStatus()).isEqualTo(HttpStatusCode.valueOf(422));
         assertThat(ex.getMessage()).contains("ACC-001").contains("10000");
     }
 
@@ -86,7 +87,7 @@ class BankingExceptionsTest {
     void kycFailedException_hasCorrectErrorCodeAndStatus() {
         var ex = new KycFailedException("PAN invalid");
         assertThat(ex.getErrorCode()).isEqualTo("KYC_FAILED");
-        assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(ex.getHttpStatus()).isEqualTo(HttpStatusCode.valueOf(422));
         assertThat(ex.getMessage()).contains("PAN invalid");
     }
 
