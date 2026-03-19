@@ -58,3 +58,12 @@ logs/
 # ── Test reports ──────────────────────────────────────────────────────────────
 test-results/
 jacoco/
+
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+node_modules/
+dist/
+.vite/
+coverage/
+.eslintcache
+*.tsbuildinfo
+.npm/
