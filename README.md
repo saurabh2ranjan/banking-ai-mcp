@@ -84,7 +84,7 @@ banking-ai-gateway ◄───────── all modules ◄─────
 | **MapStruct** | Zero boilerplate mapping between entity and DTO |
 | **Fund Holds** | Debit holds placed on `initiatePayment`, released on complete/fail |
 | **Fraud Rules** | Strategy pattern — each rule is a separate `@Component`, easily extensible |
-| **Security** | API Key filter (`X-API-Key`) — swap for JWT/OAuth2 in production |
+| **Security** | API Key filter (`X-API-Key`) on all REST endpoints; MCP endpoints (`/sse`, `/mcp/**`) are open — secure at network boundary in production |
 | **Audit Logging** | AOP aspect logs all controller calls with caller, timing, and outcome |
 | **Exception Hierarchy** | Typed exceptions with HTTP status codes — never leaks stack traces |
 | **Session Management** | In-memory map with max 1000 sessions and 50-message history trim |
@@ -177,6 +177,14 @@ curl -X POST http://localhost:8080/api/v1/banking-ai/chat \
   -H "X-API-Key: banking-demo-key-2024" \
   -d '{"sessionId":"s1","message":"Send 85000 USD from ACC-001 to ACC-002 via SWIFT. Run fraud check and take appropriate action."}'
 ```
+
+### MCP Inspector (dev tool)
+Connect directly to the 20 banking tools without AI — useful for testing individual tools:
+```
+Transport: SSE
+URL:       http://localhost:8080/sse
+```
+No API key required. Once connected, Inspector calls `POST /mcp/message` automatically for `tools/list` and `tools/call`.
 
 ### H2 Console (dev only)
 ```
