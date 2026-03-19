@@ -46,9 +46,11 @@ spring:
 
     mcp:
       server:
+        enabled: true    # activates McpServerSseWebMvcAutoConfiguration
         name: banking-mcp-server
         version: 1.0.0
-        type: SYNC
+        type: SYNC       # API style: SYNC (blocking) vs ASYNC (reactive)
+        protocol: SSE    # transport: SSE enables /mcp/sse endpoint
         capabilities:
           tool: true
 

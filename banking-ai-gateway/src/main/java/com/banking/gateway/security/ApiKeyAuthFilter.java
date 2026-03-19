@@ -39,7 +39,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
         // Skip auth for actuator and H2 console
         String uri = request.getRequestURI();
-        if (uri.startsWith("/actuator") || uri.startsWith("/h2-console")) {
+        if (uri.startsWith("/actuator") || uri.startsWith("/h2-console") || uri.equals("/sse") || uri.startsWith("/mcp")) {
             chain.doFilter(request, response);
             return;
         }
