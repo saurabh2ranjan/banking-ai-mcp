@@ -267,20 +267,20 @@ class CustomerOnboardingServiceTest {
         }
 
         @Test
-        void kycPending_throwsOnboardingException() {
+        void kycPending_throwsKycNotApprovedException() {
             Customer c = buildCustomer("CUST-001", Customer.KycStatus.PENDING, Customer.OnboardingStatus.INITIATED);
             when(customerRepository.findById("CUST-001")).thenReturn(Optional.of(c));
             assertThatThrownBy(() -> service.completeOnboarding("CUST-001"))
-                    .isInstanceOf(OnboardingException.class)
-                    .hasMessageContaining("KYC is not verified");
+                    .isInstanceOf(KycNotApprovedException.class)
+                    .hasMessageContaining("CUST-001");
         }
 
         @Test
-        void kycRejected_throwsOnboardingException() {
+        void kycRejected_throwsKycNotApprovedException() {
             Customer c = buildCustomer("CUST-001", Customer.KycStatus.REJECTED, Customer.OnboardingStatus.REJECTED);
             when(customerRepository.findById("CUST-001")).thenReturn(Optional.of(c));
             assertThatThrownBy(() -> service.completeOnboarding("CUST-001"))
-                    .isInstanceOf(OnboardingException.class);
+                    .isInstanceOf(KycNotApprovedException.class);
         }
     }
 

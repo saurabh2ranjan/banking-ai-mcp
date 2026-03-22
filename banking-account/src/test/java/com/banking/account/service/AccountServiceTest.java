@@ -104,14 +104,14 @@ class AccountServiceTest {
     }
 
     @Test
-        void kycNotVerified_throwsOnboardingException() {
+        void kycNotVerified_throwsKycNotApprovedException() {
         verifiedCustomer.setKycStatus(Customer.KycStatus.PENDING);
         when(onboardingService.getCustomerEntity("CUST-001")).thenReturn(verifiedCustomer);
 
         assertThatThrownBy(() -> accountService.openAccount(
                 new OpenAccountRequest("CUST-001", Account.AccountType.SAVINGS, "GBP", null, null, null, null)))
-                .isInstanceOf(OnboardingException.class)
-                .hasMessageContaining("KYC is not verified");
+                .isInstanceOf(KycNotApprovedException.class)
+                .hasMessageContaining("CUST-001");
         verify(accountRepository, never()).save(any());
     }
 

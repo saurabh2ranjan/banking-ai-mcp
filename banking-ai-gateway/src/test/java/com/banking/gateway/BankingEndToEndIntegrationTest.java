@@ -138,8 +138,8 @@ class BankingEndToEndIntegrationTest {
         String id = ob.customerId();
         assertThatThrownBy(() -> accountService.openAccount(
                 new OpenAccountRequest(id, Account.AccountType.SAVINGS, "GBP", null, null, null, null)))
-            .isInstanceOf(OnboardingException.class)
-            .hasMessageContaining("KYC is not verified");
+            .isInstanceOf(KycNotApprovedException.class)
+            .hasMessageContaining(id);
     }
 
     // ─── 4. Duplicate guards ──────────────────────────────────────────────────
@@ -178,8 +178,8 @@ class BankingEndToEndIntegrationTest {
         String id = ob.customerId();
         assertThatThrownBy(() -> accountService.openAccount(
                 new OpenAccountRequest(id, Account.AccountType.SAVINGS, "GBP", null, null, null, null)))
-            .isInstanceOf(OnboardingException.class)
-            .hasMessageContaining("KYC is not verified");
+            .isInstanceOf(KycNotApprovedException.class)
+            .hasMessageContaining(id);
     }
 
     @Test

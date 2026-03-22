@@ -106,6 +106,14 @@ class BankingExceptionsTest {
     }
 
     @Test
+    void kycNotApprovedException_hasCorrectErrorCodeAndStatus() {
+        var ex = new KycNotApprovedException("CUST-001");
+        assertThat(ex.getErrorCode()).isEqualTo("KYC_NOT_APPROVED");
+        assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(ex.getMessage()).contains("CUST-001");
+    }
+
+    @Test
     void allExceptions_extendBankingExceptionAndRuntimeException() {
         assertThat(new CustomerNotFoundException("x")).isInstanceOf(BankingException.class);
         assertThat(new AccountNotFoundException("x")).isInstanceOf(BankingException.class);

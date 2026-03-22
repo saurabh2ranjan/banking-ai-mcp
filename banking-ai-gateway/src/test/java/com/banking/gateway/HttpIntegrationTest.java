@@ -269,16 +269,16 @@ class HttpIntegrationTest {
     }
 
     @Test
-        @DisplayName("KYC not verified → 400 with ONBOARDING_FAILED")
-        void kycNotVerified_returns400() throws Exception {
+        @DisplayName("KYC not verified → 403 with KYC_NOT_APPROVED")
+        void kycNotVerified_returns403() throws Exception {
         OnboardingResponse ob = onboardingService.initiateOnboarding(
                 validOnboardingRequest("acc.nokyc@example.com", "+447700800060", "HTTPH1234F"));
         OpenAccountRequest req = new OpenAccountRequest(
                 ob.customerId(), Account.AccountType.SAVINGS, "GBP", null, null, null, null);
         mockMvc.perform(withAuth(post(ACCOUNTS)
                 .contentType(MediaType.APPLICATION_JSON).content(toJson(req))))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.errorCode").value("ONBOARDING_FAILED"));
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.errorCode").value("KYC_NOT_APPROVED"));
         }
     }
 

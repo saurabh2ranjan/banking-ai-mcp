@@ -103,6 +103,12 @@ public class BankingExceptions {
         }
     }
 
+    public static class KycNotApprovedException extends BankingException {
+        public KycNotApprovedException(String customerId) {
+            super("KYC is not approved for customer: " + customerId, "KYC_NOT_APPROVED", HttpStatus.FORBIDDEN);
+        }
+    }
+
     // ─── System ──────────────────────────────────────────────────────────────
 
     public static class ConcurrentModificationException extends BankingException {

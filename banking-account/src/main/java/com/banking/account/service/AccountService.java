@@ -36,7 +36,7 @@ public class AccountService {
         // Validate customer is onboarded and KYC verified
         var customer = onboardingService.getCustomerEntity(request.customerId());
         if (!customer.isKycVerified()) {
-            throw new OnboardingException("Account cannot be opened — KYC is not verified for customer: " + request.customerId());
+            throw new KycNotApprovedException(request.customerId());
         }
         if (!customer.isOnboardingComplete()) {
             throw new OnboardingException("Account cannot be opened — onboarding is not complete for customer: " + request.customerId());

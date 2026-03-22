@@ -94,7 +94,7 @@ public class CustomerOnboardingService {
         Customer customer = findCustomerById(customerId);
 
         if (!customer.isKycVerified()) {
-            throw new OnboardingException("Cannot complete onboarding — KYC is not verified");
+            throw new KycNotApprovedException(customerId);
         }
 
         customer.setOnboardingStatus(OnboardingStatus.COMPLETED);
