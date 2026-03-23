@@ -12,6 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./gradlew test
 
 # Run tests for a specific module
+./gradlew :banking-common:test
 ./gradlew :banking-account:test
 ./gradlew :banking-ai-gateway:test
 ./gradlew :banking-payment:test
@@ -108,7 +109,7 @@ A standalone Spring Boot app (`spring-ai-starter-mcp-client`, port 8081) that co
 - **Fraud ops:** trigger fraud analysis and hold payments programmatically
 - **Generic invocation:** `POST /api/mcp/tools/{toolName}` — invoke any registered tool by name (integration testing)
 
-`BankingMcpClientService` injects the auto-configured `McpSyncClient` bean; `ComplianceScheduler` is enabled via `banking.compliance.kyc-check-enabled=true` in `application.yml` (disabled by default).
+`BankingMcpClientService` injects the auto-configured `McpSyncClient` bean; `ComplianceScheduler` is enabled via `banking.compliance.kyc-check-enabled=true` in `application.yml` (enabled by default — set to `false` in production if scheduling is not needed).
 
 ### How AI Orchestration Works
 

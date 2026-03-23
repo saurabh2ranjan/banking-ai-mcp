@@ -20,7 +20,7 @@ Banking AI MCP is an AI-augmented banking operations platform that exposes 20 do
 | Application Framework | Spring Boot 4.0.3 |
 | AI Framework | Spring AI 2.0.0-M2 |
 | AI Model | OpenAI GPT-4o (temperature 0.1, max-tokens 2048) |
-| MCP Server | `spring-ai-starter-mcp-server-webmvc` (SYNC/WebMVC) |
+| MCP Server | `spring-ai-starter-mcp-server-webmvc` (SYNC API, SSE transport) |
 | MCP Client | `spring-ai-starter-mcp-client` (HTTP transport) |
 | Build System | Gradle 9 (multi-project monorepo) |
 | DB (dev/test) | H2 in-memory |
@@ -101,7 +101,7 @@ banking-mcp-client        ← standalone MCP client, direct tool invocation, no 
 
 #### `banking-ai-gateway`
 - Spring Boot application, imports all domain modules
-- Embeds MCP server (SYNC/WebMVC, port 8080)
+- Embeds MCP server (SYNC API, SSE transport, port 8080)
 - Runs `ChatClient` backed by GPT-4o with all 20 tools registered via `MethodToolCallbackProvider`
 - Manages multi-turn conversation sessions (in-memory, max 1000 sessions, 50-message trim)
 - Hosts REST API, Spring Security, AOP audit logging, global exception handler
@@ -190,7 +190,7 @@ The system prompt injected into every GPT-4o conversation enforces:
 6. RTGS/SWIFT payments require confirmation for amounts > ₹2 lakh
 7. Velocity rule triggers (>5 transactions/hour) must be flagged to supervisor
 8. Never expose internal IDs, stack traces, or system error messages to end users
-9. Conversation history is trimmed at 50 messages; summarize when approaching limit
+9. Conversation history is trimmed at 50 messages; the model should summarize context when approaching the limit
 10. All sensitive operations require double-confirmation from the requesting agent
 
 ---
@@ -199,9 +199,9 @@ The system prompt injected into every GPT-4o conversation enforces:
 
 ### 5.1 Authentication
 
-All endpoints require `X-API-Key: {key}` header.
-Optional `X-Client-ID: {name}` for audit log attribution.
-Default demo key: `banking-demo-key-2024` (override via `BANKING_API_KEY` env var).
+All endpoints require the `X-API-Key: {key}` header.
+The optional `X-Client-ID: {name}` header provides audit log attribution.
+Default demo key: `banking-demo-key-2024` (override via the `BANKING_API_KEY` env var).
 
 Public endpoints (no auth): `/actuator/health`, `/actuator/info`, `/sse`, `/mcp/**`
 
@@ -261,9 +261,10 @@ All exceptions extend `BankingException` and carry an `errorCode` string and `ht
 | `InsufficientFundsException` | 422 | `INSUFFICIENT_FUNDS` |
 | `PaymentFraudHoldException` | 403 | `PAYMENT_FRAUD_HOLD` |
 | `AccountInactiveException` | 422 | `ACCOUNT_INACTIVE` |
-| `ConcurrentModificationException` | 409 | `CONCURRENT_MODIFICATION` |
+| `ConcurrentModificationException` | 409 | `OPTIMISTIC_LOCK_FAILURE` |
+| `KycFailedException` | 422 | `KYC_FAILED` |
 | `KycNotApprovedException` | 403 | `KYC_NOT_APPROVED` |
-| `ValidationException` | 400 | `VALIDATION_ERROR` |
+| `MethodArgumentNotValidException` | 400 | `VALIDATION_ERROR` |
 
 **Rule:** Do not add generic catch-all handlers. Do not leak internal exception messages.
 
@@ -283,7 +284,7 @@ Each of the 6 fraud rules is a `@Component` implementing `FraudRule`. `FraudDete
 All entity-to-DTO conversion is done via MapStruct `@Mapper` interfaces. Manual entity-to-DTO mapping code is forbidden. Compiler arg: `-Amapstruct.defaultComponentModel=spring`.
 
 ### 7.4 AOP Audit Logging
-`AuditLogAspect` (`@Around`) intercepts all `BankingAiController.*` methods, logging caller identity (from `SecurityContextHolder`), method timing, and outcome. In production this should write to an immutable audit store (CloudTrail, dedicated audit DB).
+`AuditLogAspect` (`@Around`) intercepts all `BankingAiController.*` methods, logging caller identity (from `SecurityContextHolder`), method timing, and outcome. In production, this should write to an immutable audit store (CloudTrail, dedicated audit DB).
 
 ### 7.5 Immutable DTOs — Java Records
 All DTOs use Java records:
@@ -418,7 +419,7 @@ All other modules produce plain library JARs consumed by the gateway.
 
 **Multi-stage Dockerfile:**
 1. `builder` stage — Gradle build, outputs fat JAR
-2. `runtime` stage — `eclipse-temurin:21-jre-alpine`, non-root user `banking:banking`, JVM tuned for containers (75% RAM, G1GC, string dedup)
+2. `runtime` stage — `eclipse-temurin:21-jre-alpine` (Java 21 LTS JRE used for the container image; Java 25 is the compile/dev toolchain), non-root user `banking:banking`, JVM tuned for containers (75% RAM, G1GC, string dedup)
 
 **docker-compose.yml services:**
 - `banking-ai-gateway` — application on port 8080
