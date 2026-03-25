@@ -16,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
@@ -33,10 +34,11 @@ import static org.mockito.Mockito.*;
 @DisplayName("CustomerOnboardingService")
 class CustomerOnboardingServiceTest {
 
-    @Mock CustomerRepository  customerRepository;
-    @Mock CustomerMapper      customerMapper;
-    @Mock KycValidator        kycValidator;
-    @Mock NotificationService notificationService;
+    @Mock CustomerRepository     customerRepository;
+    @Mock CustomerMapper         customerMapper;
+    @Mock KycValidator           kycValidator;
+    @Mock NotificationService    notificationService;
+    @Mock ApplicationEventPublisher eventPublisher;
 
     @InjectMocks CustomerOnboardingService service;
 

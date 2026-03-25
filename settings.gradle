@@ -2,6 +2,7 @@ rootProject.name = 'banking-ai-mcp'
 
 include(
     'banking-common',
+    'banking-events',
     'banking-onboarding',
     'banking-account',
     'banking-payment',

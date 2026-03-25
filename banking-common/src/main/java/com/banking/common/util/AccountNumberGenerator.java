@@ -3,6 +3,7 @@ package com.banking.common.util;
 import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Utility for generating unique, formatted bank account numbers.
@@ -11,19 +12,21 @@ import java.time.format.DateTimeFormatter;
 public final class AccountNumberGenerator {
 
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final AtomicInteger ACCOUNT_SEQ  = new AtomicInteger(RANDOM.nextInt(500_000));
+    private static final AtomicInteger CUSTOMER_SEQ = new AtomicInteger(RANDOM.nextInt(50_000_000));
 
     private AccountNumberGenerator() {}
 
     public static String generate() {
         String prefix  = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
-        String body    = String.format("%06d", RANDOM.nextInt(1_000_000));
+        String body    = String.format("%06d", ACCOUNT_SEQ.incrementAndGet() % 1_000_000);
         String partial = prefix + body;
         int    check   = luhnCheckDigit(partial);
         return "ACC-" + prefix + "-" + body + "-" + check;
     }
 
     public static String generateCustomerId() {
-        return "CUST-" + String.format("%08d", RANDOM.nextInt(100_000_000));
+        return "CUST-" + String.format("%08d", CUSTOMER_SEQ.incrementAndGet() % 100_000_000);
     }
 
     private static int luhnCheckDigit(String number) {

@@ -64,6 +64,8 @@ server:
     enabled: true
 
 banking:
+  kafka:
+    enabled: ${BANKING_KAFKA_ENABLED:false}   # activate via 'kafka' profile or env var
   security:
     api-key: ${BANKING_API_KEY:banking-demo-key-2024}
 

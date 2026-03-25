@@ -86,7 +86,8 @@ subprojects {
                         '**/dto/**',
                         '**/config/**',
                         '**/*Application*',
-                        '**/exception/**'
+                        '**/exception/**',
+                        '**/events/**'
                 ])
             }))
         }

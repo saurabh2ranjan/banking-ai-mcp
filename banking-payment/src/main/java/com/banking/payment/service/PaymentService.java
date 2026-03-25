@@ -2,6 +2,11 @@ package com.banking.payment.service;
 
 import com.banking.account.service.AccountService;
 import com.banking.common.exception.BankingExceptions.*;
+import com.banking.events.EventMetadata;
+import com.banking.events.notification.EmailNotificationEvent;
+import com.banking.events.notification.FraudAlertNotificationEvent;
+import com.banking.events.notification.SmsNotificationEvent;
+import com.banking.events.payment.PaymentStatusChangedEvent;
 import com.banking.notification.service.NotificationService;
 import com.banking.payment.domain.Payment;
 import com.banking.payment.dto.PaymentDtos.*;
@@ -9,6 +14,8 @@ import com.banking.payment.mapper.PaymentMapper;
 import com.banking.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -25,10 +32,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PaymentService {
 
-    private final PaymentRepository   paymentRepository;
-    private final PaymentMapper       paymentMapper;
-    private final AccountService      accountService;
-    private final NotificationService notificationService;
+    private final PaymentRepository      paymentRepository;
+    private final PaymentMapper          paymentMapper;
+    private final AccountService         accountService;
+    private final NotificationService    notificationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public PaymentResponse initiatePayment(InitiatePaymentRequest req) {
@@ -68,6 +76,17 @@ public class PaymentService {
         notificationService.sendPaymentInitiatedSms(
             req.sourceAccountId(), saved.getPaymentId(), req.amount(), req.currency());
 
+        // Publish events for Kafka (fire after commit via @TransactionalEventListener)
+        eventPublisher.publishEvent(new PaymentStatusChangedEvent(
+                saved.getPaymentId(), req.customerId(), req.sourceAccountId(),
+                req.destinationAccountId(), null, Payment.PaymentStatus.PENDING_FRAUD_CHECK.name(),
+                req.amount(), req.currency(), req.paymentType().name(),
+                EventMetadata.now("banking-payment", MDC.get("traceId"))));
+        eventPublisher.publishEvent(new SmsNotificationEvent(
+                req.customerId(), req.sourceAccountId(),
+                "Payment " + saved.getPaymentId() + " initiated for " + req.amount() + " " + req.currency(),
+                EventMetadata.now("banking-payment", MDC.get("traceId"))));
+
         return paymentMapper.toResponse(saved);
     }
 
@@ -94,6 +113,17 @@ public class PaymentService {
             payment.getSourceAccountId(), "Customer", payment.getPaymentId(),
             payment.getAmount(), payment.getCurrency(), payment.getReferenceNumber());
 
+        eventPublisher.publishEvent(new PaymentStatusChangedEvent(
+                payment.getPaymentId(), payment.getCustomerId(), payment.getSourceAccountId(),
+                payment.getDestinationAccountId(), Payment.PaymentStatus.PROCESSING.name(),
+                Payment.PaymentStatus.COMPLETED.name(), payment.getAmount(), payment.getCurrency(),
+                payment.getPaymentType().name(), EventMetadata.now("banking-payment", MDC.get("traceId"))));
+        eventPublisher.publishEvent(new EmailNotificationEvent(
+                payment.getCustomerId(), payment.getSourceAccountId(), "Customer",
+                "Payment Completed", "Payment " + payment.getReferenceNumber() + " completed for "
+                + payment.getAmount() + " " + payment.getCurrency(),
+                EventMetadata.now("banking-payment", MDC.get("traceId"))));
+
         log.info("Payment COMPLETED: {} ({})", paymentId, payment.getReferenceNumber());
         return paymentMapper.toResponse(saved);
     }
@@ -108,8 +138,19 @@ public class PaymentService {
         payment.setFailureReason(reason);
         // Hold stays in place — amount not released
         notificationService.sendFraudAlertToCompliance(paymentId, fraudScore, riskLevel.name());
-        log.warn("🚨 Payment on FRAUD_HOLD: {} | Score: {} | Level: {}", paymentId, fraudScore, riskLevel);
-        return paymentMapper.toResponse(paymentRepository.save(payment));
+
+        Payment saved = paymentRepository.save(payment);
+        eventPublisher.publishEvent(new PaymentStatusChangedEvent(
+                paymentId, payment.getCustomerId(), payment.getSourceAccountId(),
+                payment.getDestinationAccountId(), Payment.PaymentStatus.PENDING_FRAUD_CHECK.name(),
+                Payment.PaymentStatus.FRAUD_HOLD.name(), payment.getAmount(), payment.getCurrency(),
+                payment.getPaymentType().name(), EventMetadata.now("banking-payment", MDC.get("traceId"))));
+        eventPublisher.publishEvent(new FraudAlertNotificationEvent(
+                payment.getCustomerId(), paymentId, fraudScore, riskLevel.name(),
+                EventMetadata.now("banking-payment", MDC.get("traceId"))));
+
+        log.warn("Payment on FRAUD_HOLD: {} | Score: {} | Level: {}", paymentId, fraudScore, riskLevel);
+        return paymentMapper.toResponse(saved);
     }
 
     @Transactional
@@ -121,7 +162,19 @@ public class PaymentService {
         payment.setFailureReason(reason);
         notificationService.sendPaymentFailedAlert(
             payment.getSourceAccountId(), "Customer", paymentId, reason);
-        return paymentMapper.toResponse(paymentRepository.save(payment));
+
+        Payment saved = paymentRepository.save(payment);
+        eventPublisher.publishEvent(new PaymentStatusChangedEvent(
+                paymentId, payment.getCustomerId(), payment.getSourceAccountId(),
+                payment.getDestinationAccountId(), null, Payment.PaymentStatus.FAILED.name(),
+                payment.getAmount(), payment.getCurrency(), payment.getPaymentType().name(),
+                EventMetadata.now("banking-payment", MDC.get("traceId"))));
+        eventPublisher.publishEvent(new EmailNotificationEvent(
+                payment.getCustomerId(), payment.getSourceAccountId(), "Customer",
+                "Payment Failed", "Payment " + paymentId + " failed: " + reason,
+                EventMetadata.now("banking-payment", MDC.get("traceId"))));
+
+        return paymentMapper.toResponse(saved);
     }
 
     @Transactional

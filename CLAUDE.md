@@ -22,6 +22,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Run a single test class
 ./gradlew :banking-account:test --tests "com.banking.account.mcp.AccountMcpToolTest"
 ./gradlew :banking-mcp-client:test --tests "com.banking.client.service.BankingMcpClientServiceTest"
+./gradlew :banking-ai-gateway:test --tests "com.banking.gateway.filter.CorrelationIdFilterTest"
 
 # Run with coverage
 ./gradlew test jacocoRootReport
@@ -38,6 +39,8 @@ docker-compose up
 **Required environment variables:**
 - `OPENAI_API_KEY` — required for AI features
 - `BANKING_API_KEY` — API authentication key (defaults to `banking-demo-key-2024`)
+- `BANKING_KAFKA_ENABLED` — set `true` to activate Kafka publishers/consumers (or use `kafka` Spring profile)
+- `SPRING_KAFKA_BOOTSTRAP_SERVERS` — Kafka bootstrap servers (default: `localhost:9092,localhost:9094,localhost:9096`)
 
 **Runtime endpoints (dev):**
 - Gateway API: `http://localhost:8080`
@@ -46,14 +49,21 @@ docker-compose up
 - Health: `http://localhost:8080/actuator/health`
 - MCP SSE (Inspector): `http://localhost:8080/sse`
 - MCP Messages: `http://localhost:8080/mcp/message`
+- Kafka UI: `http://localhost:8090` (docker-compose only)
+
+**Correlation ID tracing:**
+Pass `X-Correlation-ID: <your-id>` on any request; the same value appears in every log line for that request, in every Kafka message header, and in all consumer logs downstream. If the header is absent a UUID is auto-generated. The value is always echoed back in the response header.
 
 **Running MCP client alongside gateway:**
 ```bash
-# Terminal 1 — MCP server (gateway)
-cd banking-ai-gateway && SPRING_PROFILES_ACTIVE=dev OPENAI_API_KEY=sk-... ../gradlew bootRun
+# Terminal 1 — MCP server (gateway), with Kafka enabled
+cd banking-ai-gateway && SPRING_PROFILES_ACTIVE=dev,kafka OPENAI_API_KEY=sk-... ../gradlew bootRun
 
-# Terminal 2 — MCP client
-cd banking-mcp-client && ../gradlew bootRun
+# Terminal 2 — MCP client (with Kafka KYC consumer)
+cd banking-mcp-client && SPRING_PROFILES_ACTIVE=kafka ../gradlew bootRun
+
+# Without Kafka (dev only)
+cd banking-ai-gateway && SPRING_PROFILES_ACTIVE=dev OPENAI_API_KEY=sk-... ../gradlew bootRun
 ```
 
 ## Architecture
@@ -65,15 +75,16 @@ cd banking-mcp-client && ../gradlew bootRun
 ```
 banking-common  (BaseEntity, Money, ApiResponse, exception hierarchy)
     ↑
-    ├── banking-notification  (email/SMS/push events)
+    ├── banking-events        (Kafka event DTOs — pure records, no Spring)
+    ├── banking-notification  (email/SMS/push events + Kafka consumer)
     ├── banking-onboarding    (customer lifecycle, KYC, AML — 5 MCP tools)
     ├── banking-account       (accounts, balance, limits, holds — 6 MCP tools)
     ├── banking-payment       (NEFT/RTGS/IMPS/UPI/SWIFT — 7 MCP tools)
     └── banking-fraud         (rule-based fraud detection — 2 MCP tools)
          ↑
-banking-ai-gateway  (Spring Boot entry point — MCP server, ChatClient, REST API — port 8080)
+banking-ai-gateway  (Spring Boot entry point — MCP server, ChatClient, REST API, Kafka consumers — port 8080)
          ↑  [MCP protocol]
-banking-mcp-client  (standalone MCP client — direct tool invocation, no AI — port 8081)
+banking-mcp-client  (standalone MCP client — direct tool invocation, Kafka KYC consumer — port 8081)
 ```
 
 ### MCP Server
@@ -125,6 +136,10 @@ Each domain module has a single `*McpTool` class (e.g., `AccountMcpTool`, `Payme
 - **AOP Audit Logging:** `AuditLogAspect` in the gateway intercepts all controller calls, recording caller, timing, and outcome.
 - **Exception Hierarchy:** Typed exceptions in `banking-common` map to HTTP status codes — do not add generic catch-all handlers or leak stack traces.
 - **DTO Mapping:** MapStruct `@Mapper` interfaces — do not write manual entity-to-DTO conversion code.
+- **Kafka Feature Flag:** All Kafka publishers and consumers are gated by `@ConditionalOnProperty(name = "banking.kafka.enabled", havingValue = "true")`. Activate via `kafka` Spring profile or env var. The system works fully without Kafka.
+- **Transactional Event Publishing:** Publishers use `@TransactionalEventListener(phase = AFTER_COMMIT)` — Kafka messages are sent only after the DB transaction commits, preventing phantom events on rollback.
+- **Correlation ID Tracing:** `CorrelationIdFilter` (`@Order(HIGHEST_PRECEDENCE)`) reads `X-Correlation-ID` from every inbound request (or generates a UUID), sets `MDC["traceId"]` (picked up by the log pattern `[%X{traceId}]`), and echoes it back in the response header. A Kafka producer interceptor stamps the same value as a Kafka message header so consumers can restore MDC and log with the same ID across async boundaries.
+- **Spring Boot 4 Kafka Module:** Spring Boot 4.0.3 requires `org.springframework.boot:spring-boot-kafka` (separate from `spring-kafka`) for `KafkaAutoConfiguration` to be present on the classpath.
 
 ### Database
 

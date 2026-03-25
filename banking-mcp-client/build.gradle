@@ -8,11 +8,18 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
+    // Events
+    implementation project(':banking-events')
+
+    // Kafka
+    implementation 'org.springframework.kafka:spring-kafka'
+
     // Spring AI MCP Client (HTTP transport — connects to the gateway's WebMVC MCP server)
     implementation 'org.springframework.ai:spring-ai-starter-mcp-client'
 
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
     testRuntimeOnly    'org.junit.platform:junit-platform-launcher'
 }

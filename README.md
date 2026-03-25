@@ -1,8 +1,9 @@
 # Banking AI MCP Platform
 ### Production-Grade Multi-Module Spring Boot + Spring AI + MCP
 
-A **7-module** Spring Boot monorepo demonstrating Model Context Protocol (MCP) in a
-full banking lifecycle: **Customer Onboarding → KYC → Account Opening → Payments → Fraud Detection**.
+An **8-module** Spring Boot monorepo demonstrating Model Context Protocol (MCP) in a
+full banking lifecycle: **Customer Onboarding → KYC → Account Opening → Payments → Fraud Detection**,
+with event-driven architecture via **Apache Kafka** for notifications, audit trail, and compliance.
 
 ---
 
@@ -11,12 +12,13 @@ full banking lifecycle: **Customer Onboarding → KYC → Account Opening → Pa
 ```
 banking-ai-mcp/
 ├── banking-common/          Shared: BaseEntity, Money, ApiResponse, Exceptions
-├── banking-notification/    Email/SMS/Push event notifications
+├── banking-events/          Kafka event DTOs (pure records — no Spring, no JPA)
+├── banking-notification/    Email/SMS/Push notifications + Kafka consumer
 ├── banking-onboarding/      Customer lifecycle, KYC, AML screening
 ├── banking-account/         Account management, balance, limits, holds
 ├── banking-payment/         NEFT/RTGS/IMPS/UPI/SWIFT payments with fund holds
 ├── banking-fraud/           Rule-based fraud engine (Open/Closed principle)
-└── banking-ai-gateway/      Spring Boot app: security, REST APIs, AI orchestration
+└── banking-ai-gateway/      Spring Boot app: security, REST APIs, AI orchestration, Kafka consumers
 ```
 
 ## Dependency Graph
@@ -90,6 +92,9 @@ banking-ai-gateway ◄───────── all modules ◄─────
 | **Session Management** | In-memory map with max 1000 sessions and 50-message history trim |
 | **Observability** | Micrometer + Prometheus endpoint (`/actuator/prometheus`) |
 | **Pagination** | All list endpoints use `Page<T>` with `PagedResponse<T>` wrapper |
+| **Kafka Streaming** | 4 topics (notifications, payments, audit, KYC); producers publish after DB commit (`@TransactionalEventListener`); DLT + `ExponentialBackOff` on all consumers; feature-flagged via `banking.kafka.enabled` for zero-risk rollout |
+| **Kafka UI** | `provectuslabs/kafka-ui` on port 8090 for dev visibility into topics and messages |
+| **Correlation ID Tracing** | `X-Correlation-ID` header born at the HTTP boundary (auto-generated if absent), carried through MDC into every log line, stamped on every Kafka message header, and restored in all consumers — single traceable ID across sync and async boundaries |
 
 ## Fraud Rules Engine
 
@@ -119,13 +124,21 @@ export BANKING_API_KEY=my-secret-key        # optional, default: banking-demo-ke
 cd banking-ai-gateway
 SPRING_PROFILES_ACTIVE=dev ../gradlew bootRun
 
+# Run with demo data + Kafka enabled (requires Kafka on localhost:9092/9094/9096):
+SPRING_PROFILES_ACTIVE=dev,kafka ../gradlew bootRun
+
 # Run without demo data (clean slate):
 ../gradlew bootRun
+
+# Full production stack (Kafka 3-node cluster + Kafka UI included):
+docker-compose up
+# Kafka UI: http://localhost:8090
 ```
 
 ## API Reference
 
 All requests require: `X-API-Key: banking-demo-key-2024`
+Optional: `X-Correlation-ID: <your-id>` — traces the request through logs and Kafka. Auto-generated and returned in the response if not supplied.
 
 ### Onboarding
 ```bash
@@ -198,11 +211,13 @@ Username: sa | Password: (empty)
 - [ ] Replace H2 with PostgreSQL + Flyway migrations
 - [ ] Replace `ApiKeyAuthFilter` with Spring Security OAuth2 + JWT
 - [ ] Replace in-memory session `ConcurrentHashMap` with Redis (`spring-session-data-redis`)
-- [ ] Replace `NotificationService` log stubs with real Mail + Twilio + Kafka
+- [x] Kafka event streaming (notifications, payments, audit, KYC) — activate via `kafka` profile
+- [ ] Replace `NotificationService` log stubs with real Mail + Twilio integrations
 - [ ] Add external KYC bureau integration (Onfido, Jumio, or govt API)
 - [ ] Add external AML/sanctions screening (OFAC SDN list, PEP database)
 - [ ] Wire ML fraud model (ONNX runtime or Python sidecar via REST)
-- [ ] Add distributed tracing (Micrometer Tracing + Zipkin/Jaeger)
+- [x] Correlation ID tracing (`X-Correlation-ID` header → MDC → Kafka header → consumer MDC)
+- [ ] Micrometer Tracing + Zipkin/Jaeger for span-level distributed tracing
 - [ ] Add rate limiting (Bucket4j or API Gateway)
 - [ ] Add Flyway for database migrations (`ddl-auto: validate`)
 - [ ] Add Spring Cache (`@Cacheable`) on read-heavy account queries

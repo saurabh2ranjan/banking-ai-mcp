@@ -6,10 +6,14 @@ import com.banking.account.mapper.AccountMapper;
 import com.banking.account.repository.AccountRepository;
 import com.banking.common.exception.BankingExceptions.*;
 import com.banking.common.util.AccountNumberGenerator;
+import com.banking.events.EventMetadata;
+import com.banking.events.notification.EmailNotificationEvent;
 import com.banking.notification.service.NotificationService;
 import com.banking.onboarding.service.CustomerOnboardingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,10 +26,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AccountService {
 
-    private final AccountRepository          accountRepository;
-    private final AccountMapper              accountMapper;
-    private final CustomerOnboardingService  onboardingService;
-    private final NotificationService        notificationService;
+    private final AccountRepository            accountRepository;
+    private final AccountMapper                accountMapper;
+    private final CustomerOnboardingService    onboardingService;
+    private final NotificationService          notificationService;
+    private final ApplicationEventPublisher    eventPublisher;
 
     // ─── Account Opening ──────────────────────────────────────────────────
 
@@ -70,6 +75,11 @@ public class AccountService {
 
         notificationService.sendAccountOpenedNotification(
             customer.getEmail(), customer.getFullName(), saved.getAccountId(), request.accountType().name());
+
+        eventPublisher.publishEvent(new EmailNotificationEvent(
+                request.customerId(), customer.getEmail(), customer.getFullName(),
+                "Account Opened", "Your " + request.accountType().name() + " account " + saved.getAccountId() + " has been opened.",
+                EventMetadata.now("banking-account", MDC.get("traceId"))));
 
         return accountMapper.toResponse(saved);
     }
@@ -146,7 +156,12 @@ public class AccountService {
         account.setStatus(Account.AccountStatus.BLOCKED);
         Account saved = accountRepository.save(account);
         log.warn("Account BLOCKED: {} | Reason: {}", accountId, reason);
-        // In production: notify customer + compliance
+
+        eventPublisher.publishEvent(new EmailNotificationEvent(
+                saved.getCustomerId(), null, null,
+                "Account Blocked", "Your account " + accountId + " has been blocked. Reason: " + reason,
+                EventMetadata.now("banking-account", MDC.get("traceId"))));
+
         return accountMapper.toResponse(saved);
     }
 

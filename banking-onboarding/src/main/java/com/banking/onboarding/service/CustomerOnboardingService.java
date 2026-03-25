@@ -2,6 +2,9 @@ package com.banking.onboarding.service;
 
 import com.banking.common.exception.BankingExceptions.*;
 import com.banking.common.util.AccountNumberGenerator;
+import com.banking.events.EventMetadata;
+import com.banking.events.notification.EmailNotificationEvent;
+import com.banking.events.onboarding.KycStatusChangedEvent;
 import com.banking.notification.service.NotificationService;
 import com.banking.onboarding.domain.Customer;
 import com.banking.onboarding.domain.Customer.KycStatus;
@@ -12,6 +15,8 @@ import com.banking.onboarding.repository.CustomerRepository;
 import com.banking.onboarding.validator.KycValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -24,10 +29,11 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class CustomerOnboardingService {
 
-    private final CustomerRepository   customerRepository;
-    private final CustomerMapper       customerMapper;
-    private final KycValidator         kycValidator;
-    private final NotificationService  notificationService;
+    private final CustomerRepository      customerRepository;
+    private final CustomerMapper          customerMapper;
+    private final KycValidator            kycValidator;
+    private final NotificationService     notificationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // ─── Onboarding Workflow ──────────────────────────────────────────────
 
@@ -56,6 +62,11 @@ public class CustomerOnboardingService {
         // Async notification (fire-and-forget in real system)
         notificationService.sendWelcomeEmail(saved.getEmail(), saved.getFullName());
 
+        eventPublisher.publishEvent(new EmailNotificationEvent(
+                saved.getCustomerId(), saved.getEmail(), saved.getFullName(),
+                "Welcome", "Welcome to our bank, " + saved.getFullName() + "!",
+                EventMetadata.now("banking-onboarding", MDC.get("traceId"))));
+
         return new OnboardingResponse(
             saved.getCustomerId(),
             saved.getOnboardingStatus().name(),
@@ -70,6 +81,8 @@ public class CustomerOnboardingService {
 
         KycStatus newStatus = request.kycStatus();
         customer.setKycStatus(newStatus);
+
+        String previousKycStatus = customer.getKycStatus() != null ? customer.getKycStatus().name() : null;
 
         if (KycStatus.VERIFIED.equals(newStatus)) {
             customer.setKycVerifiedAt(LocalDateTime.now());
@@ -86,7 +99,18 @@ public class CustomerOnboardingService {
             log.warn("KYC rejected for customer: {}, reason: {}", customer.getCustomerId(), request.rejectionReason());
         }
 
-        return customerMapper.toResponse(customerRepository.save(customer));
+        CustomerResponse response = customerMapper.toResponse(customerRepository.save(customer));
+
+        eventPublisher.publishEvent(new KycStatusChangedEvent(
+                customer.getCustomerId(), customer.getEmail(), customer.getFullName(),
+                previousKycStatus, newStatus.name(), request.rejectionReason(),
+                EventMetadata.now("banking-onboarding", MDC.get("traceId"))));
+        eventPublisher.publishEvent(new EmailNotificationEvent(
+                customer.getCustomerId(), customer.getEmail(), customer.getFullName(),
+                "KYC Status Update", "Your KYC status has been updated to: " + newStatus.name(),
+                EventMetadata.now("banking-onboarding", MDC.get("traceId"))));
+
+        return response;
     }
 
     @Transactional
@@ -100,6 +124,11 @@ public class CustomerOnboardingService {
         customer.setOnboardingStatus(OnboardingStatus.COMPLETED);
         customer.setOnboardingCompletedAt(LocalDateTime.now());
         notificationService.sendOnboardingCompleteEmail(customer.getEmail(), customer.getFullName());
+
+        eventPublisher.publishEvent(new EmailNotificationEvent(
+                customer.getCustomerId(), customer.getEmail(), customer.getFullName(),
+                "Onboarding Complete", "Congratulations! Your onboarding is now complete.",
+                EventMetadata.now("banking-onboarding", MDC.get("traceId"))));
 
         return customerMapper.toResponse(customerRepository.save(customer));
     }

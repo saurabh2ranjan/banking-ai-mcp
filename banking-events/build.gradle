@@ -1,0 +1,8 @@
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+    // Jackson annotations for JSON serialization — NO Spring, NO JPA
+    implementation 'com.fasterxml.jackson.core:jackson-annotations'
+}

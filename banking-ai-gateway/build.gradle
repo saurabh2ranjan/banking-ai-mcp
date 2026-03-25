@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     implementation project(':banking-common')
+    implementation project(':banking-events')
     implementation project(':banking-onboarding')
     implementation project(':banking-account')
     implementation project(':banking-payment')
@@ -26,6 +27,10 @@ dependencies {
     implementation 'org.springframework.ai:spring-ai-starter-mcp-server-webmvc'
     implementation 'org.springframework.ai:spring-ai-mcp'
 
+    // Kafka
+    implementation 'org.springframework.boot:spring-boot-kafka'
+    implementation 'org.springframework.kafka:spring-kafka'
+
     // Observability
     implementation 'io.micrometer:micrometer-registry-prometheus'
 
@@ -39,5 +44,6 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'    // @WebMvcTest, @AutoConfigureMockMvc
     testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'  // @DataJpaTest
     testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
     testImplementation 'com.h2database:h2'
 }

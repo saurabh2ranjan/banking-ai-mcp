@@ -16,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
@@ -32,10 +33,11 @@ import static org.mockito.Mockito.*;
 @DisplayName("PaymentService")
 class PaymentServiceTest {
 
-    @Mock PaymentRepository   paymentRepository;
-    @Mock PaymentMapper       paymentMapper;
-    @Mock AccountService      accountService;
-    @Mock NotificationService notificationService;
+    @Mock PaymentRepository      paymentRepository;
+    @Mock PaymentMapper          paymentMapper;
+    @Mock AccountService         accountService;
+    @Mock NotificationService    notificationService;
+    @Mock ApplicationEventPublisher eventPublisher;
 
     @InjectMocks PaymentService paymentService;
 

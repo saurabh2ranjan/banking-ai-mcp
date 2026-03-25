@@ -15,6 +15,8 @@ server:
   port: 8081   # different port so both apps can run together
 
 banking:
+  kafka:
+    enabled: ${BANKING_KAFKA_ENABLED:false}   # activate via 'kafka' profile or env var
   compliance:
     kyc-check-enabled: true   # set false in prod if scheduling not needed
 

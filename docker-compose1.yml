@@ -1,57 +1,23 @@
+version: "3.9"
+
 networks:
   kafka-net:
     driver: bridge
     name: kafka-net
 
+volumes:
+  kafka-1-data:
+  kafka-2-data:
+  kafka-3-data:
+
 services:
-
-  # ── PostgreSQL (replace H2 in production) ────────────────────────────────────
-  postgres:
-    image: postgres:16-alpine
-    container_name: banking-postgres
-    environment:
-      POSTGRES_DB: bankingdb
-      POSTGRES_USER: banking
-      POSTGRES_PASSWORD: banking_secret
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U banking -d bankingdb"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ── Redis (session + cache) ───────────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    container_name: banking-redis
-    ports:
-      - "6379:6379"
-    command: redis-server --requirepass redis_secret
-    healthcheck:
-      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "redis_secret", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ── Zipkin (distributed tracing) ─────────────────────────────────────────────
-  zipkin:
-    image: openzipkin/zipkin:3
-    container_name: banking-zipkin
-    ports:
-      - "9411:9411"
-
-  # ── Apache Kafka 3-node KRaft cluster (no ZooKeeper) ────────────────────────
-
   kafka-1:
     image: apache/kafka:4.1.1
     container_name: kafka-1
     hostname: kafka-1
     ports:
-      - "9092:9092"       # EXTERNAL — host/Spring Boot access
-      - "9093:9093"       # Controller (exposed for debugging)
+      - "9092:9092"       # Broker (client access from host/Spring Boot)
+      - "9093:9093"       # Controller (internal, exposed for debugging)
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -76,7 +42,10 @@ services:
       KAFKA_SOCKET_RECEIVE_BUFFER_BYTES: 102400
       KAFKA_SOCKET_REQUEST_MAX_BYTES: 104857600
       KAFKA_NUM_RECOVERY_THREADS_PER_DATA_DIR: 1
+      KAFKA_LOG_DIRS: /var/kafka/kraft-combined-logs
       CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+    volumes:
+      - kafka-1-data:/var/kafka/kraft-combined-logs
     networks:
       - kafka-net
     deploy:
@@ -96,8 +65,8 @@ services:
     container_name: kafka-2
     hostname: kafka-2
     ports:
-      - "9094:9094"       # EXTERNAL — host/Spring Boot access
-      - "9095:9095"       # Controller
+      - "9094:9094"       # Broker (client access from host/Spring Boot)
+      - "9095:9095"       # Controller (internal, exposed for debugging)
     environment:
       KAFKA_NODE_ID: 2
       KAFKA_PROCESS_ROLES: broker,controller
@@ -122,7 +91,10 @@ services:
       KAFKA_SOCKET_RECEIVE_BUFFER_BYTES: 102400
       KAFKA_SOCKET_REQUEST_MAX_BYTES: 104857600
       KAFKA_NUM_RECOVERY_THREADS_PER_DATA_DIR: 1
+      KAFKA_LOG_DIRS: /var/kafka/kraft-combined-logs
       CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+    volumes:
+      - kafka-2-data:/var/kafka/kraft-combined-logs
     networks:
       - kafka-net
     deploy:
@@ -142,8 +114,8 @@ services:
     container_name: kafka-3
     hostname: kafka-3
     ports:
-      - "9096:9096"       # EXTERNAL — host/Spring Boot access
-      - "9097:9097"       # Controller
+      - "9096:9096"       # Broker (client access from host/Spring Boot)
+      - "9097:9097"       # Controller (internal, exposed for debugging)
     environment:
       KAFKA_NODE_ID: 3
       KAFKA_PROCESS_ROLES: broker,controller
@@ -168,7 +140,10 @@ services:
       KAFKA_SOCKET_RECEIVE_BUFFER_BYTES: 102400
       KAFKA_SOCKET_REQUEST_MAX_BYTES: 104857600
       KAFKA_NUM_RECOVERY_THREADS_PER_DATA_DIR: 1
+      KAFKA_LOG_DIRS: /var/kafka/kraft-combined-logs
       CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+    volumes:
+      - kafka-3-data:/var/kafka/kraft-combined-logs
     networks:
       - kafka-net
     deploy:
@@ -183,7 +158,6 @@ services:
       retries: 5
       start_period: 30s
 
-  # ── Kafka UI (dev convenience) ──────────────────────────────────────────────
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
@@ -206,44 +180,3 @@ services:
         limits:
           memory: 512m
           cpus: "0.5"
-
-  # ── Banking AI Gateway ────────────────────────────────────────────────────────
-  banking-ai-gateway:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: banking-ai-gateway
-    ports:
-      - "8080:8080"
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bankingdb
-      SPRING_DATASOURCE_USERNAME: banking
-      SPRING_DATASOURCE_PASSWORD: banking_secret
-      SPRING_REDIS_HOST: redis
-      SPRING_REDIS_PASSWORD: redis_secret
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      BANKING_API_KEY: ${BANKING_API_KEY:-banking-demo-key-2024}
-      SPRING_PROFILES_ACTIVE: kafka
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka-1:19092,kafka-2:19094,kafka-3:19096
-    networks:
-      - default
-      - kafka-net
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      kafka-1:
-        condition: service_healthy
-      kafka-2:
-        condition: service_healthy
-      kafka-3:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-volumes:
-  postgres_data:

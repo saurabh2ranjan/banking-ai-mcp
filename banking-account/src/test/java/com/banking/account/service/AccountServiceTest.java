@@ -17,6 +17,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -32,10 +33,11 @@ import static org.mockito.Mockito.*;
 @DisplayName("AccountService")
 class AccountServiceTest {
 
-    @Mock AccountRepository         accountRepository;
-    @Mock AccountMapper             accountMapper;
-    @Mock CustomerOnboardingService onboardingService;
-    @Mock NotificationService       notificationService;
+    @Mock AccountRepository          accountRepository;
+    @Mock AccountMapper              accountMapper;
+    @Mock CustomerOnboardingService  onboardingService;
+    @Mock NotificationService        notificationService;
+    @Mock ApplicationEventPublisher  eventPublisher;
 
     @InjectMocks AccountService accountService;
 
