@@ -66,6 +66,8 @@ cd banking-mcp-client && SPRING_PROFILES_ACTIVE=kafka ../gradlew bootRun
 cd banking-ai-gateway && SPRING_PROFILES_ACTIVE=dev OPENAI_API_KEY=sk-... ../gradlew bootRun
 ```
 
+---
+
 ## Architecture
 
 **Stack:** Spring Boot 4.0.3 · Java 25 · Spring AI 2.0.0-M2 · Gradle monorepo
@@ -102,51 +104,42 @@ spring.ai.mcp.server:
     tool: true
 ```
 
-This exposes the 20 banking tools over the MCP protocol. MCP endpoints (no API key required):
+MCP endpoints (no API key required):
 - `GET  http://localhost:8080/sse`          — SSE connection (Inspector/client connects here)
 - `POST http://localhost:8080/mcp/message`  — JSON-RPC tool calls
 
-Any MCP-compatible client (MCP Inspector, Claude Desktop, `banking-mcp-client`) can connect and invoke tools directly — in addition to the built-in REST chat endpoint.
-
-**Tool registration** (`BankingAiConfig`): `MethodToolCallbackProvider` reflects over all four `*McpTool` beans at startup, discovers `@Tool`-annotated methods, and registers them both with the `ChatClient` (for internal GPT-4o calls) and with the MCP server (for external clients). AOP proxy unwrapping (`AopProxyUtils.getSingletonTarget`) is required because `MethodToolCallbackProvider` reads annotations via reflection on the real class, not the proxy.
+**Tool registration** (`BankingAiConfig`): `MethodToolCallbackProvider` reflects over all `*McpTool` beans at startup.
+AOP proxy unwrapping (`AopProxyUtils.getSingletonTarget`) is **required** — without it, `@Tool` annotations are invisible to reflection and tools are silently dropped.
 
 ### MCP Client (`banking-mcp-client`)
 
-A standalone Spring Boot app (`spring-ai-starter-mcp-client`, port 8081) that connects to the gateway's MCP server and invokes tools **directly without AI orchestration**. Use cases:
+A standalone Spring Boot app (`spring-ai-starter-mcp-client`, port 8081) that connects to the gateway's MCP server and invokes tools **directly without AI orchestration**.
 
-- **Compliance automation:** `ComplianceScheduler` runs hourly KYC checks and 5-minute server health pings
-- **Admin/Ops:** block accounts, check balances, query spending summaries via REST
-- **Fraud ops:** trigger fraud analysis and hold payments programmatically
-- **Generic invocation:** `POST /api/mcp/tools/{toolName}` — invoke any registered tool by name (integration testing)
-
-`BankingMcpClientService` injects the auto-configured `McpSyncClient` bean; `ComplianceScheduler` is enabled via `banking.compliance.kyc-check-enabled=true` in `application.yml` (disabled by default).
+`BankingMcpClientService` injects the auto-configured `McpSyncClient` bean; `ComplianceScheduler` is enabled via `banking.compliance.kyc-check-enabled=true` (disabled by default).
 
 ### How AI Orchestration Works
 
-`banking-ai-gateway` runs a Spring AI `ChatClient` backed by GPT-4o. All domain modules expose `@Tool`-annotated methods (via `MethodToolCallbackProvider`), which Spring AI auto-discovers and makes available to the model. The gateway manages conversation sessions in-memory (max 1000 sessions, 50-message trim).
-
-### MCP Tool Classes
-
-Each domain module has a single `*McpTool` class (e.g., `AccountMcpTool`, `PaymentMcpTool`) that holds all `@Tool` methods for that domain. These are registered as Spring beans and scanned by the gateway.
+`banking-ai-gateway` runs a Spring AI `ChatClient` backed by GPT-4o. All domain modules expose `@Tool`-annotated methods (via `MethodToolCallbackProvider`). The gateway manages conversation sessions in-memory (max 1000 sessions, 50-message trim).
 
 ### Key Patterns
 
-- **Fund Holds:** `initiatePayment` places an immediate hold on funds; the hold is released on complete or fail — prevents double-spending.
-- **Fraud Engine:** Six `@Component` rule classes are scored and summed. Adding a new rule = add a new component implementing the rule interface.
-- **AOP Audit Logging:** `AuditLogAspect` in the gateway intercepts all controller calls, recording caller, timing, and outcome.
-- **Exception Hierarchy:** Typed exceptions in `banking-common` map to HTTP status codes — do not add generic catch-all handlers or leak stack traces.
-- **DTO Mapping:** MapStruct `@Mapper` interfaces — do not write manual entity-to-DTO conversion code.
-- **Kafka Feature Flag:** All Kafka publishers and consumers are gated by `@ConditionalOnProperty(name = "banking.kafka.enabled", havingValue = "true")`. Activate via `kafka` Spring profile or env var. The system works fully without Kafka.
-- **Transactional Event Publishing:** Publishers use `@TransactionalEventListener(phase = AFTER_COMMIT)` — Kafka messages are sent only after the DB transaction commits, preventing phantom events on rollback.
-- **Correlation ID Tracing:** `CorrelationIdFilter` (`@Order(HIGHEST_PRECEDENCE)`) reads `X-Correlation-ID` from every inbound request (or generates a UUID), sets `MDC["traceId"]` (picked up by the log pattern `[%X{traceId}]`), and echoes it back in the response header. A Kafka producer interceptor stamps the same value as a Kafka message header so consumers can restore MDC and log with the same ID across async boundaries.
-- **Spring Boot 4 Kafka Module:** Spring Boot 4.0.3 requires `org.springframework.boot:spring-boot-kafka` (separate from `spring-kafka`) for `KafkaAutoConfiguration` to be present on the classpath.
+- **Fund Holds:** `initiatePayment` places an immediate hold on funds; released on complete or fail — prevents double-spending.
+- **Fraud Engine:** Rule classes are `@Component` beans scored and summed. Add a new rule = add a new component implementing the rule interface.
+- **AOP Audit Logging:** `AuditLogAspect` intercepts all controller calls — do not duplicate audit logging in services.
+- **Exception Hierarchy:** Typed exceptions in `banking-common` map to HTTP status codes — do not add generic catch-all handlers.
+- **DTO Mapping:** MapStruct `@Mapper` interfaces only — no manual entity-to-DTO conversion.
+- **Kafka Feature Flag:** All Kafka code gated by `@ConditionalOnProperty(name = "banking.kafka.enabled", havingValue = "true")`.
+- **Transactional Event Publishing:** `@TransactionalEventListener(phase = AFTER_COMMIT)` — Kafka messages sent only after DB commit.
+- **Correlation ID Tracing:** `CorrelationIdFilter` (`@Order(HIGHEST_PRECEDENCE)`) reads/generates `X-Correlation-ID`, sets `MDC["traceId"]`.
+- **Spring Boot 4 Kafka:** Requires `org.springframework.boot:spring-boot-kafka` (separate from `spring-kafka`).
 
 ### Database
 
 - **Dev/Test:** H2 in-memory; schema auto-created from JPA entities
 - **Production:** PostgreSQL 16 (via docker-compose)
-- Entities use `@Version` for optimistic locking; service methods use `@Transactional`
+- All entities use `@Version` for optimistic locking; all service write methods use `@Transactional`
 
 ### Code Coverage
 
-JaCoCo enforces **70% minimum** line/branch coverage. Tests must maintain this threshold or `./gradlew build` will fail.
+JaCoCo enforces **70% minimum** line/branch coverage — `./gradlew build` fails below this threshold.
+Excluded: `domain/`, `dto/`, `config/`, `*Application`, `exception/`, `events/`
