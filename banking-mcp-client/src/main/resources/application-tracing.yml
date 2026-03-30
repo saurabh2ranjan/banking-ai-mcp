@@ -1,0 +1,31 @@
+# Activated via: SPRING_PROFILES_ACTIVE=tracing (or kafka,tracing)
+# Requires OTel Collector running: docker compose --profile tracing up
+
+management:
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+    propagation:
+      type: w3c
+    export:
+      otlp:
+        enabled: true
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/traces
+      transport: http
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/traces
+          transport: http
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
+logging:
+  level:
+    io.opentelemetry: INFO
+    io.micrometer.tracing: DEBUG

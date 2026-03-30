@@ -11,6 +11,7 @@ spring:
         max.in.flight.requests.per.connection: 5
         interceptor.classes: com.banking.gateway.kafka.CorrelationIdProducerInterceptor
     consumer:
+      group-id: banking-gateway-group   # stable ID — prevents offset reset on restart
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       auto-offset-reset: earliest

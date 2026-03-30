@@ -18,10 +18,17 @@ banking:
   kafka:
     enabled: ${BANKING_KAFKA_ENABLED:false}   # activate via 'kafka' profile or env var
   compliance:
-    kyc-check-enabled: true   # set false in prod if scheduling not needed
+    kyc-check-enabled: false   # opt-in only — enable explicitly in the environment that needs scheduling
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info
+
+logging:
+  # pattern managed by logback-spring.xml
+  level:
+    com.banking: INFO
+    org.springframework.ai: INFO
+    org.springframework.security: WARN

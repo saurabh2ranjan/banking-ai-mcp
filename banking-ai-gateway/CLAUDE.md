@@ -11,7 +11,7 @@ Spring Boot entry point. Owns: MCP server, ChatClient (GPT-4o), REST API, AOP au
 
 ## Package Ownership
 ```
-config/      ← BankingAiConfig (tool registration), SecurityConfig, WebConfig
+config/      ← BankingAiConfig (tool registration), SecurityConfig, WebConfig, TracingConfig
 controller/  ← REST endpoints + GlobalExceptionHandler
 filter/      ← CorrelationIdFilter (@Order(HIGHEST_PRECEDENCE))
 audit/       ← AuditLogAspect (@Around all controllers)
@@ -33,6 +33,14 @@ service/     ← ChatSessionService (in-memory session store)
 - Always echo back the correlation ID in the response header `X-Correlation-ID`
 - Never remove this filter or move its order
 
+## TracingConfig Rules (`@Profile("tracing")`)
+- `TracingBridgeFilter` runs at `@Order(HIGHEST_PRECEDENCE + 1)` — immediately after `CorrelationIdFilter`
+- Bridges the custom correlation ID to OTel: tags the current span with `correlation.id` attribute
+- Writes OTel `spanId` and `correlationId` into MDC for structured JSON logging (Loki)
+- Must clean up MDC keys (`spanId`, `correlationId`) in `finally` — same pattern as `CorrelationIdFilter`
+- Never move this filter before `CorrelationIdFilter` — it depends on `MDC["traceId"]` being set first
+- Only active when `tracing` profile is enabled — zero overhead in dev/prod without tracing
+
 ## AuditLogAspect Rules
 - Intercepts all `@RestController` methods — do not add audit logging in service layers
 - Logs: caller identity, method name, duration, outcome (success/failure)
@@ -46,12 +54,20 @@ service/     ← ChatSessionService (in-memory session store)
 
 ## Security Config Rules
 - `BANKING_API_KEY` header is required for all business endpoints
-- Public endpoints (no auth): `/sse`, `/mcp/message`, `/actuator/health`, `/h2-console/**` (dev only)
-- H2 console must be disabled in production profile — guard with `@Profile("dev")`
+- Public endpoints (no auth): `/sse`, `/mcp/message`, `/actuator/health`, `/actuator/prometheus`, `/h2-console/**` (dev only)
+- `/actuator/prometheus` is public for Prometheus scraping (metrics collection)
+- H2 console is controlled via Spring profiles: enabled in `application-dev.yml`, explicitly disabled in `application-prod.yml` and the base `application.yml` — do not use `@Profile("dev")` on a bean
 - Never add `permitAll()` to a business endpoint without explicit approval
+
+## Logging Rules
+- Log patterns are managed by `logback-spring.xml` — do NOT add `logging.pattern.console` to YAML files
+- `logback-spring.xml` selects appender by profile: colored console (dev/default) or JSON via `LogstashEncoder` (tracing)
+- `logging.level` entries in YAML files still work alongside `logback-spring.xml`
 
 ## Testing in This Module
 - Controller tests: use `@WebMvcTest` + mock service dependencies
 - Filter tests: use `MockMvc` with `@SpringBootTest(webEnvironment=MOCK)`
 - Do not write integration tests that call real OpenAI API — mock the `ChatClient`
-- Kafka consumer tests: use `@EmbeddedKafka`
+- `application-test.yml` excludes `KafkaAutoConfiguration` — this prevents Spring Boot from wiring a `ProducerFactory`/`KafkaTemplate` and attempting connections to `localhost:9092` on every test run
+- `application-test.yml` also excludes OTel tracing auto-configuration (`OpenTelemetryTracingAutoConfiguration`, `OtlpTracingAutoConfiguration`, `OpenTelemetrySdkAutoConfiguration`, `OtlpMetricsExportAutoConfiguration`) and sets `management.tracing.enabled=false` to prevent OTLP connection attempts in tests
+- Kafka consumer tests: use `@EmbeddedKafka` with a dedicated profile (e.g. `@ActiveProfiles("test", "kafka-test")`) that does NOT exclude `KafkaAutoConfiguration`, so embedded Kafka beans can be wired up

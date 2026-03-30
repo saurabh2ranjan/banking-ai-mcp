@@ -28,12 +28,37 @@ spring:
       # @ConditionalOnBean(ChatModel.class); nested AiTestConfig provides mock beans.
       - org.springframework.ai.autoconfigure.openai.OpenAiAutoConfiguration
       - org.springframework.ai.autoconfigure.chat.client.ChatClientAutoConfiguration
+      # Exclude Kafka — spring-boot-kafka is on the classpath unconditionally, so
+      # KafkaAutoConfiguration fires regardless of banking.kafka.enabled.
+      # This prevents ProducerFactory/KafkaTemplate creation and the resulting
+      # connection attempts to localhost:9092 on every test run.
+      - org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration
+      # Exclude OTel — prevents OTLP exporter from attempting connections
+      # to localhost:4318 during tests.
+      - org.springframework.boot.micrometer.tracing.opentelemetry.autoconfigure.OpenTelemetryTracingAutoConfiguration
+      - org.springframework.boot.micrometer.tracing.opentelemetry.autoconfigure.otlp.OtlpTracingAutoConfiguration
+      - org.springframework.boot.opentelemetry.autoconfigure.OpenTelemetrySdkAutoConfiguration
+      - org.springframework.boot.micrometer.metrics.autoconfigure.export.otlp.OtlpMetricsExportAutoConfiguration
+
+management:
+  tracing:
+    enabled: false   # prevent OTel tracing in tests
 
 banking:
+  kafka:
+    enabled: false   # never activate Kafka in tests regardless of env vars
   security:
     api-key: test-api-key
 
+server:
+  error:
+    include-message: never        # match production error behavior in test assertions
+    include-stacktrace: never
+
 logging:
+  # pattern managed by logback-spring.xml
   level:
     com.banking: INFO
+    org.springframework.ai: WARN
+    org.springframework.security: WARN
     org.hibernate.SQL: WARN

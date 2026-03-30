@@ -17,8 +17,7 @@ spring:
 
   h2:
     console:
-      enabled: true
-      path: /h2-console
+      enabled: false   # enabled only in dev profile
 
   jpa:
     database-platform: org.hibernate.dialect.H2Dialect
@@ -89,5 +88,4 @@ logging:
     #org.springframework.boot.autoconfigure.h2: DEBUG
     #org.springframework.boot.autoconfigure.condition: DEBUG
     org.hibernate.SQL: WARN
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId}] %logger{36} - %msg%n"
+  # pattern managed by logback-spring.xml (profile-conditional: colored console / JSON)

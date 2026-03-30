@@ -1,0 +1,15 @@
+spring:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  jpa:
+    show-sql: true
+
+logging:
+  # pattern managed by logback-spring.xml
+  level:
+    org.springframework.ai.chat.client.advisor: DEBUG
+    org.springframework.ai.model.tool: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE   # logs bound parameter values

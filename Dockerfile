@@ -1,25 +1,27 @@
 # ── Build Stage ───────────────────────────────────────────────────────────────
-FROM eclipse-temurin:21-jdk-alpine AS builder
+FROM eclipse-temurin:25-jdk-alpine AS builder
 WORKDIR /workspace
 
 COPY gradlew gradlew.bat ./
 COPY gradle/ gradle/
-COPY build.gradle.kts settings.gradle.kts ./
+COPY build.gradle settings.gradle ./
 
 # Copy all module sources
-COPY banking-common/     banking-common/
+COPY banking-common/       banking-common/
+COPY banking-events/       banking-events/
 COPY banking-notification/ banking-notification/
-COPY banking-onboarding/ banking-onboarding/
-COPY banking-account/    banking-account/
-COPY banking-payment/    banking-payment/
-COPY banking-fraud/      banking-fraud/
-COPY banking-ai-gateway/ banking-ai-gateway/
+COPY banking-onboarding/   banking-onboarding/
+COPY banking-account/      banking-account/
+COPY banking-payment/      banking-payment/
+COPY banking-fraud/        banking-fraud/
+COPY banking-ai-gateway/   banking-ai-gateway/
+COPY banking-mcp-client/   banking-mcp-client/
 
 RUN chmod +x gradlew
 RUN ./gradlew :banking-ai-gateway:bootJar --no-daemon -q
 
 # ── Runtime Stage ─────────────────────────────────────────────────────────────
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 
 # Non-root user for security

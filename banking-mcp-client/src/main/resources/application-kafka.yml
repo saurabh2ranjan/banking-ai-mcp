@@ -9,6 +9,8 @@ spring:
       enable-auto-commit: false
       properties:
         spring.json.trusted.packages: "com.banking.events.*"
+    listener:
+      ack-mode: RECORD   # commit offset per message — consistent with gateway
 
 banking:
   kafka:

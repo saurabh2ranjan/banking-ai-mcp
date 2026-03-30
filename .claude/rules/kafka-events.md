@@ -44,6 +44,7 @@ Activation methods:
 ## Correlation ID Propagation
 - Every Kafka message must carry `X-Correlation-ID` as a Kafka message header
 - Producer interceptor stamps the correlation ID from MDC automatically — do not set headers manually
+- When the `tracing` profile is active, Micrometer Tracing auto-instruments `KafkaTemplate` and `@KafkaListener` with W3C `traceparent` headers — this coexists with the custom `X-Correlation-ID` header (they are independent)
 - Every consumer must restore MDC from the Kafka header at the start of the `@KafkaListener` method:
   ```java
   @KafkaListener(topics = "banking.kyc.events")
