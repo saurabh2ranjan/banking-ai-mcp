@@ -24,13 +24,13 @@ initiatePayment()
 - `@Version` on `Account` entity catches concurrent hold attempts (optimistic lock exception → retry or reject)
 
 ## MCP Tools in This Module (AccountMcpTool)
-Expected tools (do not rename or remove without updating BankingAiConfig):
-1. `getAccountBalance` — retrieve balance + status for an account
-2. `createAccount` — open a new account for an existing customer
-3. `updateAccountLimits` — modify daily/monthly transaction limits
-4. `blockAccount` — suspend an account (fraud/compliance trigger)
-5. `getTransactionHistory` — paginated list of recent transactions
-6. `getSpendingSummary` — aggregated spending by category/period
+Actual tool names (as registered with Spring AI — do not rename without updating BankingAiConfig):
+1. `open_bank_account` — open a new account for an existing customer
+2. `get_account_details` — retrieve full account details
+3. `get_account_balance` — retrieve balance + status for an account
+4. `get_customer_accounts` — list all accounts for a customer
+5. `check_sufficient_funds` — verify an account has enough available balance
+6. `block_account` — suspend an account (fraud/compliance trigger)
 
 ## Service Rules Specific to This Module
 - `AccountService.getAccount()` must throw `AccountNotFoundException` (not return `Optional`)

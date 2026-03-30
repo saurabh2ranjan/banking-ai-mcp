@@ -13,80 +13,66 @@ The rule should detect: $1
 
 The fraud engine in `banking-fraud` uses a pluggable, component-scanned scoring model:
 
-1. `FraudDetectionService` injects `List<FraudRule>` — Spring auto-discovers all `@Component` beans implementing `FraudRule`
-2. Each rule scores a payment (0–100), higher = riskier
-3. Scores are summed and thresholds applied:
-   - `< 30` → APPROVE
-   - `30–69` → HOLD_FOR_REVIEW
-   - `≥ 70` → BLOCK
+1. `FraudDetectionService` injects `List<FraudRule>` — Spring auto-discovers all `@Component` beans implementing `FraudRules.FraudRule`
+2. Each rule evaluates a `Payment` entity (with access to `PaymentService` for lookups) and returns a `FraudRuleResult(ruleName, triggered, scoreContribution, description)`
+3. Score contributions are doubles (0.0–1.0), summed and capped at 1.0:
+   - `< 0.40` → APPROVE
+   - `0.40–0.70` → HOLD_FOR_REVIEW
+   - `≥ 0.70` → BLOCK
 4. `FraudMcpTool` exposes the result to AI via `analyse_payment_fraud_risk`
 
-**Adding a new rule = adding a new `@Component`** — no other wiring needed.
+**Adding a new rule = adding a new nested `@Component` static class inside `FraudRules.java`** — no other wiring needed.
 
 ## Step 1 — Read the existing rules
 
-Read the existing rule files in `banking-fraud/src/main/java/com/banking/fraud/rules/` to understand the interface and pattern. There should be a `FraudRule` interface with a `score(...)` method. Understand the input data model before writing anything.
+Read `banking-fraud/src/main/java/com/banking/fraud/rules/FraudRules.java` to understand the interface and existing patterns. All rules are nested static `@Component` classes implementing the `FraudRule` interface.
 
-## Step 2 — Create the rule class
+## Step 2 — Add the rule class
 
-File: `banking-fraud/src/main/java/com/banking/fraud/rules/$0Rule.java`
+Add a new nested static class inside `FraudRules.java`:
 
 ```java
-package com.banking.fraud.rules;
+// ─── Rule N: $0 ────────────────────────────────────────────────
 
-import com.banking.fraud.domain.FraudCheckContext; // or whatever the input type is
-import lombok.extern.slf4j.Slf4j;
-import org.slf4j.MDC;
-import org.springframework.stereotype.Component;
-
-@Slf4j
 @Component
-public class $0Rule implements FraudRule {
+public static class $0Rule implements FraudRule {
 
     @Override
-    public int score(FraudCheckContext context) {
+    public FraudRuleResult evaluate(Payment payment, PaymentService paymentService) {
         // Your detection logic here.
-        // Return 0 if rule doesn't apply, higher if suspicious.
-        // Max contribution: keep proportional to rule confidence.
+        // Return FraudRuleResult with:
+        //   - ruleName: unique identifier (e.g., "$0")
+        //   - triggered: true if rule fires
+        //   - scoreContribution: 0.0 if not triggered, 0.08–0.45 if triggered
+        //   - description: human-readable explanation
 
-        log.debug("[{}] $0Rule evaluated: score={}",
-            MDC.get("traceId"), score);
-
-        return score;
-    }
-
-    @Override
-    public String getRuleName() {
-        return "$0Rule";
+        boolean triggered = /* your condition */;
+        return new FraudRuleResult("$0", triggered,
+            triggered ? 0.15 : 0.0,
+            triggered ? "Suspicious pattern detected" : "No anomaly");
     }
 }
 ```
 
-### Scoring guidelines
-- Return `0` if the rule does not apply to this payment context
-- Return `10–30` for mild anomalies (slightly unusual, low confidence)
-- Return `30–60` for moderate signals (clear pattern match)
-- Return `60–100` for high-confidence fraud signals
-- **Never return negative scores** — abstain by returning 0
-- **Never throw exceptions** from `score()` — catch internal errors and return 0 with a warning log
+### Score contribution guidelines
+- Return `0.0` if the rule does not apply
+- Return `0.08–0.15` for mild anomalies (low confidence)
+- Return `0.15–0.30` for moderate signals (clear pattern match)
+- Return `0.30–0.45` for high-confidence fraud signals
+- **Never return negative scores** — abstain by returning 0.0
+- **Never throw exceptions** from `evaluate()` — catch internal errors and return a safe result
+
+### Available data in `evaluate()`
+- `payment` — the `Payment` entity with: amount (`BigDecimal`), currency, paymentType (NEFT/RTGS/IMPS/UPI/SWIFT), sourceAccountId, destinationAccountId, status, timestamps
+- `paymentService` — for lookups like `getRecentPayments(accountId, hours)` and `getDailySpendingSummary(accountId)`
 
 ### What NOT to do
-- Do not call external services — keep rules fast and synchronous
-- Do not access the database in a rule — context data should already be loaded by `FraudDetectionService`
+- Do not make external API calls — keep rules fast and synchronous
 - Do not log PII (name, email, address) — only log `paymentId`, `accountId`, score value
 - Do not add `@Transactional` — rules are read-only and stateless
+- Do not create a separate file — add the nested class inside `FraudRules.java`
 
-## Step 3 — Understand the context model
-
-Read `FraudCheckContext` (or whatever the input model is) to know what data is available. Common fields include:
-- Payment amount, currency, type (NEFT/RTGS/IMPS/UPI/SWIFT)
-- Source/destination account IDs
-- Customer's payment history (velocity data)
-- Timestamp, device fingerprint, geographic info
-
-If the rule needs data not currently in the context, add it to `FraudCheckContext` and update `FraudDetectionService` to populate it.
-
-## Step 4 — Write the test
+## Step 3 — Write the test
 
 File: `banking-fraud/src/test/java/com/banking/fraud/rules/$0RuleTest.java`
 
@@ -94,45 +80,46 @@ File: `banking-fraud/src/test/java/com/banking/fraud/rules/$0RuleTest.java`
 @ExtendWith(MockitoExtension.class)
 class $0RuleTest {
 
-    private $0Rule rule;
+    private FraudRules.$0Rule rule;
+
+    @Mock
+    private PaymentService paymentService;
 
     @BeforeEach
     void setUp() {
-        rule = new $0Rule();
+        rule = new FraudRules.$0Rule();
     }
 
     @Test
-    void score_whenRuleDoesNotApply_thenReturnsZero() {
+    void evaluate_whenRuleDoesNotApply_thenNotTriggered() {
         // given
-        var context = normalPaymentContext();
+        var payment = buildNormalPayment();
 
         // when
-        int score = rule.score(context);
+        var result = rule.evaluate(payment, paymentService);
 
         // then
-        assertThat(score).isEqualTo(0);
+        assertThat(result.triggered()).isFalse();
+        assertThat(result.scoreContribution()).isEqualTo(0.0);
     }
 
     @Test
-    void score_whenHighRiskPattern_thenReturnsHighScore() {
+    void evaluate_whenSuspiciousPattern_thenTriggeredWithScore() {
         // given
-        var context = suspiciousPaymentContext(); // build a context that triggers this rule
+        var payment = buildSuspiciousPayment(); // build a payment that triggers this rule
 
         // when
-        int score = rule.score(context);
+        var result = rule.evaluate(payment, paymentService);
 
         // then
-        assertThat(score).isGreaterThan(50);
-    }
-
-    @Test
-    void score_whenExceptionOccurs_thenReturnsZeroSafely() {
-        // Verify the rule doesn't throw — fraud engine must never fail
+        assertThat(result.triggered()).isTrue();
+        assertThat(result.scoreContribution()).isGreaterThan(0.0);
+        assertThat(result.ruleName()).isEqualTo("$0");
     }
 }
 ```
 
-## Step 5 — Verify end-to-end
+## Step 4 — Verify end-to-end
 
 1. Run unit tests: `./gradlew :banking-fraud:test`
 2. Check the rule appears in `analyse_payment_fraud_risk` output under `triggeredRules` for matching inputs
@@ -140,9 +127,10 @@ class $0RuleTest {
 
 ## Checklist
 
-- [ ] Rule class created with `@Component` + `@Slf4j`
-- [ ] `score()` never throws — all exceptions caught internally
-- [ ] No PII in logs — only IDs and numeric scores
-- [ ] No DB access in rule — reads from `FraudCheckContext` only
-- [ ] Test covers: rule doesn't apply (score=0), high-risk detection (score>50), exception safety
+- [ ] Rule added as nested `@Component` static class in `FraudRules.java`
+- [ ] Implements `FraudRule` interface with `evaluate(Payment, PaymentService)` signature
+- [ ] Returns `FraudRuleResult` — never throws
+- [ ] No PII in descriptions — only IDs and numeric values
+- [ ] No DB access beyond `PaymentService` methods
+- [ ] Test covers: rule doesn't apply (score=0.0), suspicious detection (score>0.0)
 - [ ] `./gradlew :banking-fraud:build` passes

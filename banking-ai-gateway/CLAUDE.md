@@ -18,7 +18,7 @@ audit/       ← AuditLogAspect (@Around all controllers)
 consumer/    ← Kafka listeners (gated by banking.kafka.enabled)
 kafka/       ← Kafka producer interceptor (stamps correlationId header)
 security/    ← API key validation, public endpoint whitelist
-service/     ← ChatSessionService (in-memory session store)
+service/     ← BankingAiService (in-memory session store, ChatClient orchestration)
 ```
 
 ## BankingAiConfig Rules

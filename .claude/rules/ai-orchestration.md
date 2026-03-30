@@ -3,7 +3,7 @@ paths:
   - "banking-ai-gateway/**"
   - "banking-mcp-client/**"
   - "**/config/BankingAiConfig.java"
-  - "**/service/ChatSessionService.java"
+  - "**/service/BankingAiService.java"
   - "**/controller/BankingAiController.java"
 ---
 

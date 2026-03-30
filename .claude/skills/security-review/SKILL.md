@@ -98,10 +98,12 @@ For any code touching payments, balances, or holds:
 - [ ] H2 console config not present in production profile
 - [ ] No secrets in `application.yml` committed — all `${ENV_VAR}` references
 
-## Step 8 — Correlation ID & Audit Check
+## Step 8 — Correlation ID, Tracing & Audit Check
 
 - [ ] All log statements in request-scoped code include `MDC.get("traceId")`
 - [ ] `CorrelationIdFilter` not removed or bypassed
+- [ ] When `tracing` profile is active: `TracingBridgeFilter` bridges correlation ID to OTel spans — verify no PII is added as span attributes or baggage (only `correlation.id` is safe)
+- [ ] OTel trace IDs and span IDs are safe to log — they are infrastructure identifiers, not PII
 - [ ] Kafka consumer methods restore `MDC["traceId"]` from headers and clear in `finally`
 - [ ] State-changing operations (account creation, payments, KYC decisions) are covered by `AuditLogAspect` — not duplicating audit logging in service layer
 

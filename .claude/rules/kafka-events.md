@@ -67,7 +67,7 @@ Activation methods:
 ## Event Record Design
 - All event records live in `banking-events` module — never define them inline in producers or consumers
 - Event records must be Java `record` types (immutable)
-- Required fields on every event: `eventId` (UUID), `occurredAt` (Instant), `correlationId` (String)
+- Required fields on every event: wrap in `EventMetadata` record which carries `eventId` (String/UUID), `timestamp` (Instant), `source` (String), `correlationId` (String)
 - Event records must be serializable to JSON — no custom serializers unless unavoidable
 - Topic naming convention: `banking.{domain}.{action}` — e.g., `banking.account.created`, `banking.kyc.approved`
 
@@ -84,5 +84,5 @@ Activation methods:
 ## What NOT To Do
 - Do not call `kafkaTemplate.send()` inside a `@Transactional` method body — use the AFTER_COMMIT pattern
 - Do not use `String` for Kafka message keys where domain IDs exist — use the actual entity ID
-- Do not share Kafka topic names as magic strings — define them as constants in a `KafkaTopics` class
+- Do not share Kafka topic names as magic strings — define them as constants in `KafkaConfig` (e.g., `TOPIC_NOTIFICATIONS`, `TOPIC_PAYMENT_STATUS`)
 - Do not create Kafka producers/consumers in `banking-common` or `banking-events` modules

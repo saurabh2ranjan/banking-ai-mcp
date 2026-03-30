@@ -1,9 +1,10 @@
 # Banking AI MCP Platform
 ### Production-Grade Multi-Module Spring Boot + Spring AI + MCP
 
-An **8-module** Spring Boot monorepo demonstrating Model Context Protocol (MCP) in a
+A **10-module** Spring Boot monorepo demonstrating Model Context Protocol (MCP) in a
 full banking lifecycle: **Customer Onboarding → KYC → Account Opening → Payments → Fraud Detection**,
-with event-driven architecture via **Apache Kafka** for notifications, audit trail, and compliance.
+with event-driven architecture via **Apache Kafka**, distributed tracing via **OpenTelemetry + Grafana**,
+and a **React 18** frontend for banking operations.
 
 ---
 
@@ -18,7 +19,9 @@ banking-ai-mcp/
 ├── banking-account/         Account management, balance, limits, holds
 ├── banking-payment/         NEFT/RTGS/IMPS/UPI/SWIFT payments with fund holds
 ├── banking-fraud/           Rule-based fraud engine (Open/Closed principle)
-└── banking-ai-gateway/      Spring Boot app: security, REST APIs, AI orchestration, Kafka consumers
+├── banking-ai-gateway/      Spring Boot app: security, REST APIs, AI orchestration, Kafka consumers
+├── banking-mcp-client/      Standalone MCP client: direct tool invocation, KYC consumer (port 8081)
+└── banking-ai-frontend/     React 18 + TypeScript + Vite SPA (port 5173)
 ```
 
 ## Dependency Graph
@@ -90,7 +93,8 @@ banking-ai-gateway ◄───────── all modules ◄─────
 | **Audit Logging** | AOP aspect logs all controller calls with caller, timing, and outcome |
 | **Exception Hierarchy** | Typed exceptions with HTTP status codes — never leaks stack traces |
 | **Session Management** | In-memory map with max 1000 sessions and 50-message history trim |
-| **Observability** | Micrometer + Prometheus endpoint (`/actuator/prometheus`) |
+| **Observability** | Micrometer + Prometheus endpoint (`/actuator/prometheus`) + OpenTelemetry distributed tracing (Tempo, Loki, Grafana) |
+| **Distributed Tracing** | OpenTelemetry auto-instrumentation (HTTP, Kafka, JDBC) → OTel Collector → Grafana Tempo; `TracingBridgeFilter` bridges correlation ID to OTel spans; structured JSON logging via `LogstashEncoder` for Loki ingestion; opt-in via `tracing` Spring profile |
 | **Pagination** | All list endpoints use `Page<T>` with `PagedResponse<T>` wrapper |
 | **Kafka Streaming** | 4 topics (notifications, payments, audit, KYC); producers publish after DB commit (`@TransactionalEventListener`); DLT + `ExponentialBackOff` on all consumers; feature-flagged via `banking.kafka.enabled` for zero-risk rollout |
 | **Kafka UI** | `provectuslabs/kafka-ui` on port 8090 for dev visibility into topics and messages |
@@ -130,9 +134,20 @@ SPRING_PROFILES_ACTIVE=dev,kafka ../gradlew bootRun
 # Run without demo data (clean slate):
 ../gradlew bootRun
 
+# Run with distributed tracing (requires tracing infra running):
+docker compose --profile tracing up
+SPRING_PROFILES_ACTIVE=dev,tracing ../gradlew bootRun
+
+# Run with Kafka + tracing:
+SPRING_PROFILES_ACTIVE=dev,kafka,tracing ../gradlew bootRun
+
 # Full production stack (Kafka 3-node cluster + Kafka UI included):
 docker-compose up
 # Kafka UI: http://localhost:8090
+
+# Frontend dev server:
+cd banking-ai-frontend && npm install && npm run dev
+# Frontend: http://localhost:5173
 ```
 
 ## API Reference
@@ -217,7 +232,7 @@ Username: sa | Password: (empty)
 - [ ] Add external AML/sanctions screening (OFAC SDN list, PEP database)
 - [ ] Wire ML fraud model (ONNX runtime or Python sidecar via REST)
 - [x] Correlation ID tracing (`X-Correlation-ID` header → MDC → Kafka header → consumer MDC)
-- [ ] Micrometer Tracing + Zipkin/Jaeger for span-level distributed tracing
+- [x] Distributed tracing — OpenTelemetry + Grafana Tempo + Loki + Prometheus (opt-in via `tracing` profile)
 - [ ] Add rate limiting (Bucket4j or API Gateway)
 - [ ] Add Flyway for database migrations (`ddl-auto: validate`)
 - [ ] Add Spring Cache (`@Cacheable`) on read-heavy account queries

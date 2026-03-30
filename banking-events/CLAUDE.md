@@ -10,31 +10,37 @@ Shared Kafka event DTO module. All event records that cross module boundaries ar
 - This module is a compile-time dependency for producers AND consumers — keep it minimal
 
 ## Required Fields on Every Event Record
+All events include an `EventMetadata` record that carries tracing and deduplication fields:
 ```java
+public record EventMetadata(
+    String eventId,        // unique event identifier for deduplication (UUID string)
+    Instant timestamp,     // when the event happened (server time)
+    String source,         // originating service/module
+    String correlationId   // for distributed tracing across async boundaries
+) {}
+
 public record AccountCreatedEvent(
-    UUID eventId,          // unique event identifier for deduplication
-    Instant occurredAt,    // when the event happened (server time)
-    String correlationId,  // for distributed tracing across async boundaries
+    String accountId,
+    String customerId,
     // ... domain-specific fields
+    EventMetadata metadata
 ) {}
 ```
 
 ## Naming Convention
 - Class name: `{Domain}{Action}Event` → `AccountCreatedEvent`, `PaymentCompletedEvent`, `KycApprovedEvent`
 - Package: `com.banking.events.{domain}` → `com.banking.events.account`, `com.banking.events.kyc`
-- Topic constant (defined here as a companion interface): `KafkaTopics.ACCOUNT_CREATED = "banking.account.created"`
+- Topic constant: defined in `KafkaConfig` in `banking-ai-gateway` (e.g., `TOPIC_NOTIFICATIONS = "banking.notifications"`)
 
 ## Topic Naming
-Define all topic name constants in a single `KafkaTopics` interface in this module:
+Topic name constants are defined in `KafkaConfig` (in `banking-ai-gateway`) as static fields:
 ```java
-public interface KafkaTopics {
-    String ACCOUNT_CREATED   = "banking.account.created";
-    String PAYMENT_COMPLETED = "banking.payment.completed";
-    String KYC_APPROVED      = "banking.kyc.approved";
-    // ...
-}
+public static final String TOPIC_NOTIFICATIONS   = "banking.notifications";
+public static final String TOPIC_PAYMENT_STATUS  = "banking.payments.status";
+public static final String TOPIC_AUDIT_TRAIL     = "banking.audit.trail";
+public static final String TOPIC_KYC_STATUS      = "banking.onboarding.kyc-status";
 ```
-Producers and consumers import topic names from here — never hardcode them.
+Publishers reference these constants — avoid hardcoding topic names as magic strings.
 
 ## What NOT To Add
 - No `@Service`, `@Component`, or any Spring annotation

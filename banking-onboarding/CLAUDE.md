@@ -34,12 +34,12 @@ REGISTERED → KYC_PENDING → KYC_APPROVED → ACTIVE
 - `customerId` (UUID) is safe to log; the name associated with it is not
 
 ## MCP Tools in This Module (OnboardingMcpTool)
-Expected tools:
-1. `registerCustomer` — create customer record and initiate KYC flow
-2. `getKycStatus` — query current KYC state for a customer
-3. `approveKyc` — manually approve KYC (compliance officer action)
-4. `rejectKyc` — reject with reason code
-5. `getCustomerProfile` — retrieve customer details (PII-safe summary only)
+Actual tool names (as registered with Spring AI):
+1. `get_customer_profile` — retrieve customer details (PII-safe summary only)
+2. `get_customer_by_email` — look up customer by email address
+3. `update_kyc_status` — update KYC verification status (approve/reject)
+4. `get_pending_kyc_customers` — list customers awaiting KYC review
+5. `complete_customer_onboarding` — finalize onboarding after KYC approval
 
 ## Validator Package
 This module has a `validator/` package — use it:

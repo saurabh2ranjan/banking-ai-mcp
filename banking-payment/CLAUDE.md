@@ -34,14 +34,14 @@ PENDING → PROCESSING → COMPLETED
 - On `COMPLETED`: convert hold to actual debit and credit destination account
 
 ## MCP Tools in This Module (PaymentMcpTool)
-Expected tools:
-1. `initiatePayment` — create a new payment (places fund hold immediately)
-2. `getPaymentStatus` — query current status and details of a payment
-3. `cancelPayment` — cancel a PENDING payment and release hold
-4. `listPayments` — paginated payment history for an account
-5. `getPaymentLimits` — retrieve current daily/monthly limits for a customer
-6. `validateBeneficiary` — verify beneficiary account/IFSC before payment
-7. `getPaymentReceipt` — generate a formatted receipt for a completed payment
+Actual tool names (as registered with Spring AI):
+1. `initiate_payment` — create a new payment (places fund hold immediately)
+2. `process_payment` — advance a payment from PENDING to PROCESSING/COMPLETED
+3. `get_payment_status` — query current status and details of a payment
+4. `get_payment_history` — paginated payment history for an account
+5. `hold_payment_for_fraud` — place a fraud hold on a suspicious payment
+6. `reverse_payment` — reverse a completed payment
+7. `get_daily_spending_summary` — aggregated daily spending for an account
 
 ## Fund Hold Lifecycle in This Module
 - `initiatePayment` → calls `accountService.placeHold()` first → then creates `Payment` record

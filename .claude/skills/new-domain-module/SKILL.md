@@ -145,4 +145,6 @@ Before finishing, confirm:
 - [ ] MapStruct mapper exists
 - [ ] `$1McpTool` registered in `BankingAiConfig` with AopProxyUtils unwrap
 - [ ] Tests written (70% coverage minimum)
+- [ ] If Kafka events needed: use `EventMetadata` for correlation, feature-gate with `@ConditionalOnProperty(name = "banking.kafka.enabled")`
+- [ ] Tracing: no extra config needed — OpenTelemetry auto-instruments HTTP/Kafka/JDBC when `tracing` profile is active; just ensure log lines include `MDC.get("traceId")`
 - [ ] `./gradlew :banking-$0:build` passes

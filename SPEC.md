@@ -26,7 +26,9 @@ Banking AI MCP is an AI-augmented banking operations platform that exposes 20 do
 | DB (dev/test) | H2 in-memory |
 | DB (production) | PostgreSQL 16 |
 | Caching | Redis 7 (docker-compose) |
-| Tracing | Zipkin 3 (docker-compose) |
+| Tracing | OpenTelemetry → OTel Collector → Grafana Tempo (opt-in via `tracing` profile) |
+| Log Aggregation | Loki + Promtail (opt-in via `tracing` profile) |
+| Observability UI | Grafana (trace↔log linking, datasource auto-provisioning) |
 | Metrics | Micrometer + Prometheus |
 | ORM | Spring Data JPA / Hibernate |
 | DTO Mapping | MapStruct |
@@ -380,7 +382,9 @@ Disabled for `/api/**`, `/h2-console/**`, `/sse`, and `/mcp/**` (API clients and
 | Health | Spring Actuator | `/actuator/health` |
 | Metrics | Micrometer | `/actuator/metrics` |
 | Prometheus | Micrometer registry | `/actuator/prometheus` |
-| Distributed Tracing | Zipkin | `http://localhost:9411` (docker-compose) |
+| Distributed Tracing | OpenTelemetry → Grafana Tempo | `http://localhost:3200` (opt-in via `--profile tracing`) |
+| Log Aggregation | Loki + Promtail | `http://localhost:3100` (opt-in via `--profile tracing`) |
+| Unified Observability UI | Grafana | `http://localhost:3000` (admin/admin; auto-provisioned Tempo + Loki + Prometheus datasources) |
 | Audit Log | `AuditLogAspect` (SLF4J + Kafka) | Structured events on `banking.audit.trail`; log aggregator in production |
 | Correlation ID | `X-Correlation-ID` header → MDC → Kafka header | Single ID across HTTP, logs, and async Kafka boundaries (see §7.10) |
 
@@ -507,7 +511,12 @@ All other modules produce plain library JARs consumed by the gateway.
 - `banking-ai-gateway` — application on port 8080
 - `postgres:16-alpine` — `bankingdb`, persistent volume
 - `redis:7-alpine` — session/cache on port 6379
-- `zipkin:3` — distributed tracing on port 9411
+- `otel-collector` — OpenTelemetry Collector (OTLP receiver, opt-in `tracing` profile)
+- `tempo` — Grafana Tempo trace storage (opt-in `tracing` profile)
+- `loki` — Grafana Loki log aggregation (opt-in `tracing` profile)
+- `promtail` — Log shipper to Loki (opt-in `tracing` profile)
+- `prometheus` — Metrics scraping (opt-in `tracing` profile)
+- `grafana` — Unified observability UI on port 3000 (opt-in `tracing` profile)
 - `kafka-1`, `kafka-2`, `kafka-3` — Apache Kafka 4.1.1 KRaft 3-node cluster (ports 9092, 9094, 9096 external)
 - `kafka-ui` — Kafka UI (`provectuslabs/kafka-ui`) on port 8090
 
@@ -557,6 +566,8 @@ npm run lint     # ESLint
 | `SPRING_DATASOURCE_URL` | No | H2 in-memory | Override for PostgreSQL in prod |
 | `BANKING_KAFKA_ENABLED` | No | `false` | Activate Kafka publishers/consumers (or use `kafka` profile) |
 | `SPRING_KAFKA_BOOTSTRAP_SERVERS` | No | `localhost:9092,localhost:9094,localhost:9096` | Kafka broker addresses |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | No | `http://localhost:4318` | OTel Collector OTLP endpoint; only used when `tracing` profile active |
+| `TRACING_SAMPLING_PROBABILITY` | No | `1.0` | Trace sampling rate 0.0–1.0; set to `0.1` for production |
 
 ---
 
@@ -596,7 +607,10 @@ cd banking-ai-frontend && npm install && npm run dev
 - H2 Console: `http://localhost:8080/h2-console` (user: sa, no password)
 - Health (gateway): `http://localhost:8080/actuator/health`
 - Health (client): `http://localhost:8081/actuator/health`
-- Kafka UI: `http://localhost:8090` (docker-compose only)
+- Kafka UI: `http://localhost:8090` (docker-compose `--profile tools`)
+- Grafana: `http://localhost:3000` (admin/admin; docker-compose `--profile tracing`)
+- Tempo: `http://localhost:3200` (docker-compose `--profile tracing`)
+- Loki: `http://localhost:3100` (docker-compose `--profile tracing`)
 
 ---
 

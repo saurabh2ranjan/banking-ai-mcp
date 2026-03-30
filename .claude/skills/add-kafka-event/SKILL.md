@@ -24,16 +24,15 @@ import com.banking.events.EventMetadata;
  * Partition key: [primary entity ID field]
  */
 public record $0$1Event(
-    String correlationId,              // Always required — tracing
-    EventMetadata metadata,            // eventId, timestamp, source
-    // ... domain-specific fields ...
+    // ... domain-specific fields (e.g., accountId, paymentId, status) ...
+    EventMetadata metadata             // carries eventId, timestamp, source, correlationId
 ) {}
 ```
 
 ### Rules for the event record
 - Must use the Java `record` keyword — immutable, no behavior
-- Must include `correlationId` as a field — non-negotiable for tracing
-- Must include `EventMetadata` — carries `eventId`, `timestamp`, `source`
+- Must include `EventMetadata` — carries `eventId` (String/UUID), `timestamp` (Instant), `source` (String), `correlationId` (String)
+- `correlationId` lives inside `EventMetadata`, not as a top-level field
 - All monetary fields use `Money` type — never `BigDecimal`, `double`, or `float`
 - Include the primary entity ID (e.g., `accountId`, `paymentId`) for partition key routing
 - No Spring annotations — `banking-events` must remain a pure Java module
@@ -91,21 +90,18 @@ public class $0KafkaPublisher {
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void on$0$1($$0$1ApplicationEvent event) {
+    public void on$0$1($0$1ApplicationEvent event) {
         var kafkaEvent = event.kafkaEvent();
-        var headers = new RecordHeaders();
-        headers.add("X-Correlation-ID", kafkaEvent.correlationId().getBytes());
-
-        kafkaTemplate.send(new ProducerRecord<>(
+        // Note: X-Correlation-ID header is stamped automatically by CorrelationIdProducerInterceptor
+        // — do NOT set it manually here
+        kafkaTemplate.send(
             "banking.$0_lower.$1_lower",
-            null,
             kafkaEvent.primaryEntityId(),  // partition key
-            kafkaEvent,
-            headers
-        ));
+            kafkaEvent
+        );
 
         log.info("[{}] Published $0$1Event for id={}",
-            kafkaEvent.correlationId(), kafkaEvent.primaryEntityId());
+            kafkaEvent.metadata().correlationId(), kafkaEvent.primaryEntityId());
     }
 }
 ```

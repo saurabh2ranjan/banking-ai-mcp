@@ -53,18 +53,23 @@ String accountId,
 ```
 
 ## Return Type Contract
-- All `@Tool` methods return either `ApiResponse<T>` from `banking-common` or a well-defined DTO record
+- All `@Tool` methods return `Map<String, Object>` with a `"status"` key (`"success"` or `"error"`) and relevant data fields
 - Never return `void`, raw `String`, or untyped `Object` from a tool method
-- Never let exceptions propagate out of a `@Tool` method — catch domain exceptions and return error `ApiResponse`
+- Never let exceptions propagate out of a `@Tool` method — catch domain exceptions and return structured error maps
 - The model needs structured responses to make decisions — free-form strings break AI orchestration
 
 ```java
 // Correct
-public ApiResponse<AccountResponse> getAccountBalance(String accountId) {
+public Map<String, Object> getAccountBalance(String accountId) {
     try {
-        return ApiResponse.success(accountService.getAccount(accountId));
+        var account = accountService.getAccount(accountId);
+        return Map.of(
+            "status", "success",
+            "accountId", account.getAccountId(),
+            "balance", account.getBalance()
+        );
     } catch (AccountNotFoundException e) {
-        return ApiResponse.error(e.getErrorCode(), e.getMessage());
+        return Map.of("error", e.getMessage(), "errorCode", e.getErrorCode());
     }
 }
 
